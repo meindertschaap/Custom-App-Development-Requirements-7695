@@ -1,11 +1,11 @@
-import React, { useState, useRef, useEffect, memo } from 'react';
-import { motion } from 'framer-motion';
+import React, {useState, useRef, useEffect, memo} from 'react';
+import {motion} from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import {useSortable} from '@dnd-kit/sortable';
+import {CSS} from '@dnd-kit/utilities';
 
-const { FiCheck, FiChevronRight, FiEdit2, FiTrash2, FiStar } = FiIcons;
+const {FiCheck, FiChevronRight, FiEdit2, FiTrash2, FiStar} = FiIcons;
 
 // Memoized RowItem component to prevent unnecessary re-renders
 const RowItem = memo(function RowItem({
@@ -32,7 +32,7 @@ const RowItem = memo(function RowItem({
   const containerRef = useRef(null);
   const hoverTimeoutRef = useRef(null);
   const isHoveringRef = useRef(false);
-
+  
   // Set up sortable functionality - entire item is draggable with click-hold
   const {
     attributes,
@@ -44,7 +44,11 @@ const RowItem = memo(function RowItem({
     isOver,
   } = useSortable({
     id: item.id,
-    data: { type: type, index: index, item: item }
+    data: {
+      type: type,
+      index: index,
+      item: item
+    }
   });
 
   const style = {
@@ -77,23 +81,23 @@ const RowItem = memo(function RowItem({
     };
   }, []);
 
-  // Intelligently truncate text when actions are shown - keep TWO lines
+  // Calculate and set truncated text only once when showActions changes
   useEffect(() => {
     if (!showActions || editMode || !titleRef.current) {
       setTruncatedTitle(item.title);
       return;
     }
-
+    
     // Calculate approximate characters that fit in two lines
     const containerWidth = titleRef.current.clientWidth || 200;
     const avgCharWidth = 8; // Approximate character width in pixels
     const charsPerLine = Math.floor(containerWidth / avgCharWidth);
     const maxCharsForTwoLines = charsPerLine * 2;
-
+    
     // Reserve space for action buttons (approximately 15-20 characters worth)
     const actionsReserve = canBeStar ? 20 : 15;
     const availableChars = maxCharsForTwoLines - actionsReserve;
-
+    
     if (item.title.length > availableChars && availableChars > 10) {
       // Truncate to fit in two lines with ellipses
       const truncated = item.title.slice(0, availableChars - 3) + '...';
@@ -169,45 +173,38 @@ const RowItem = memo(function RowItem({
   };
 
   // Completely eliminate flickering with a more robust hover system
-  const handleMouseEnter = (e) => {
-    // Only trigger if we're actually entering the item element itself
-    if (e.target === containerRef.current || containerRef.current?.contains(e.target)) {
-      isHoveringRef.current = true;
-      
-      // Clear any existing timeout
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-        hoverTimeoutRef.current = null;
-      }
-      
-      // Set a longer delay to prevent rapid toggling
-      hoverTimeoutRef.current = setTimeout(() => {
-        // Only show actions if we're still hovering
-        if (isHoveringRef.current) {
-          setShowActions(true);
-        }
-      }, 150); // Increased delay
+  const handleMouseEnter = () => {
+    isHoveringRef.current = true;
+    
+    // Clear any existing timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
     }
+    
+    // Use a single timeout to set the state to prevent rapid toggling
+    hoverTimeoutRef.current = setTimeout(() => {
+      if (isHoveringRef.current) {
+        setShowActions(true);
+      }
+    }, 100);
   };
-
-  const handleMouseLeave = (e) => {
-    // Only trigger if we're actually leaving the item element
-    if (!containerRef.current?.contains(e.relatedTarget)) {
-      isHoveringRef.current = false;
-      
-      // Clear any pending timeout
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-        hoverTimeoutRef.current = null;
-      }
-      
-      // Add a small delay before hiding to prevent flicker when moving between child elements
-      setTimeout(() => {
-        if (!isHoveringRef.current) {
-          setShowActions(false);
-        }
-      }, 50);
+  
+  const handleMouseLeave = () => {
+    isHoveringRef.current = false;
+    
+    // Clear any pending timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
     }
+    
+    // Add a small delay before hiding to prevent flicker
+    hoverTimeoutRef.current = setTimeout(() => {
+      if (!isHoveringRef.current) {
+        setShowActions(false);
+      }
+    }, 100);
   };
 
   // Optimized to reduce animation load for large lists
@@ -236,27 +233,23 @@ const RowItem = memo(function RowItem({
         y: 0,
         scale: isDragging ? 1.05 : 1,
         rotate: isDragging ? 2 : 0,
-        boxShadow: isDragging
-          ? '0 25px 50px -12px rgba(0,0,0,0.25),0 0 0 1px rgba(249,115,22,0.4)'
-          : '0 1px 3px 0 rgba(0,0,0,0.1)'
+        boxShadow: isDragging ? '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(249,115,22,0.4)' : '0 1px 3px 0 rgba(0,0,0,0.1)'
       }}
       transition={{
         duration: isDragging ? 0.2 : 0.15,
         delay: isDragging ? 0 : staggerDelay,
         type: isDragging ? 'spring' : 'tween',
-        stiffness: isDragging ? 300 : 200
+        stiffness: isDragging ? 300 : 200,
+        layoutId: undefined // Remove layout animation that causes scrolling
       }}
       whileHover={!isDragging ? { x: 2 } : {}}
-      layout
     >
       <div className="flex items-start gap-3 row-item-content">
         {/* Checkbox */}
         <motion.button
           onClick={handleCheckboxClick}
           className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-            item.completed
-              ? 'bg-success-500 border-success-500 text-white'
-              : 'border-gray-300 hover:border-success-400'
+            item.completed ? 'bg-success-500 border-success-500 text-white' : 'border-gray-300 hover:border-success-400'
           }`}
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
@@ -287,10 +280,10 @@ const RowItem = memo(function RowItem({
                   item.completed ? 'text-gray-500 line-through' : 'text-gray-900'
                 } ${isSelected ? 'font-semibold' : 'font-normal'} flex items-center gap-1`}
                 style={{
-                  display: showActions ? '-webkit-box' : 'block',
+                  display: 'block',
                   WebkitLineClamp: showActions ? 2 : 'unset',
                   WebkitBoxOrient: showActions ? 'vertical' : 'unset',
-                  overflow: showActions ? 'hidden' : 'visible'
+                  overflow: 'hidden'
                 }}
               >
                 {item.starred && (

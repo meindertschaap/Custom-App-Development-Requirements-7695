@@ -3,10 +3,11 @@ import { motion } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 
-const { FiSearch, FiDownload, FiUpload, FiCopy, FiRefreshCw, FiStar } = FiIcons;
+const { FiSearch, FiDownload, FiUpload, FiCopy, FiRefreshCw, FiStar, FiGrid, FiLayers } = FiIcons;
 
 // Memoized TopBar component to prevent unnecessary re-renders
 const TopBar = memo(function TopBar({
+  title = "Brainstorm Planner",
   filter,
   setFilter,
   searchQuery,
@@ -17,8 +18,40 @@ const TopBar = memo(function TopBar({
   onCopy,
   onReset,
   onShowStarred,
-  showStarredOnly
+  showStarredOnly,
+  onOpenUseCaseSelector,
+  useCase
 }) {
+  // Get the appropriate subtitle based on the current use case
+  const getSubtitle = () => {
+    if (!useCase) return "Break big ideas into clear steps - your way";
+    
+    switch (useCase.id) {
+      case 'goal-to-action':
+        return "Break big goals into actionable steps";
+      case 'skills-practice':
+        return "Master new skills through structured practice";
+      case 'event-workshop':
+        return "Organize multi-day events with detailed sessions";
+      case 'trip-planner':
+        return "Plan your perfect trip with all details covered";
+      case 'workshop-planner':
+        return "Design engaging workshops with clear objectives";
+      case 'meeting-minutes':
+        return "Track meetings, decisions and follow-up actions";
+      case 'article-writing':
+        return "Structure your writing with supporting evidence";
+      case 'life-area-planning':
+        return "Balance and improve different areas of your life";
+      case 'problem-solver':
+        return "Break down problems into actionable solutions";
+      case 'custom-flow':
+        return "Create your own unique planning structure";
+      default:
+        return "Break big ideas into clear steps - your way";
+    }
+  };
+
   return (
     <div className="bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 py-4">
@@ -34,10 +67,21 @@ const TopBar = memo(function TopBar({
               />
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
-                  Brainstorm Planner App
+                  {title}
                 </h1>
-                <p className="text-base text-primary-600">Break big ideas into clear steps - your way</p>
+                <p className="text-base text-primary-600">{getSubtitle()}</p>
               </div>
+              
+              <motion.button
+                onClick={onOpenUseCaseSelector}
+                className="ml-2 px-3 py-1.5 bg-primary-100 text-primary-700 hover:bg-primary-200 rounded-lg transition-all flex items-center gap-1.5"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                title="Change template"
+              >
+                <SafeIcon icon={FiLayers} className="text-lg" />
+                <span className="text-sm font-medium">Change Template</span>
+              </motion.button>
             </div>
             <div className="relative max-w-md">
               <SafeIcon

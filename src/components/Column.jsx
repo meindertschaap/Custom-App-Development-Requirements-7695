@@ -35,26 +35,33 @@ const Column = memo(function Column({
   const [pendingItemSelection, setPendingItemSelection] = useState(null);
   const [headerTitle, setHeaderTitle] = useState(title);
   const headerInputRef = useRef(null);
+  const newItemInputRef = useRef(null);
 
   // Set up droppable area for the column
   const { setNodeRef, isOver } = useDroppable({
     id: `column-${type}`,
-    data: {
-      type: type,
-      accepts: [type]
-    }
+    data: { type: type, accepts: [type] }
   });
 
+  // Update headerTitle when title prop changes
   useEffect(() => {
     setHeaderTitle(title);
   }, [title]);
 
+  // Focus and select the header input when editing starts
   useEffect(() => {
     if (isEditingHeader && headerInputRef.current) {
       headerInputRef.current.focus();
       headerInputRef.current.select();
     }
   }, [isEditingHeader]);
+
+  // Focus the new item input when it becomes visible
+  useEffect(() => {
+    if (showNewItemInput && newItemInputRef.current) {
+      newItemInputRef.current.focus();
+    }
+  }, [showNewItemInput]);
 
   const handleAddItem = () => {
     if (disabled) return;
@@ -68,6 +75,13 @@ const Column = memo(function Column({
       onAdd(newItemTitle);
       // Keep the input field open for the next entry
       setNewItemTitle("");
+      
+      // Ensure focus returns to the input field
+      setTimeout(() => {
+        if (newItemInputRef.current) {
+          newItemInputRef.current.focus();
+        }
+      }, 0);
     }
   };
 
@@ -75,8 +89,15 @@ const Column = memo(function Column({
     if (newItemTitle.trim()) {
       onAdd(newItemTitle);
       setNewItemTitle("");
+      
+      // Process any pending item selection after closing the input
+      if (pendingItemSelection) {
+        onSelect(pendingItemSelection);
+        setPendingItemSelection(null);
+      }
     } else {
       setShowNewItemInput(false);
+      
       // Process any pending item selection after closing the input
       if (pendingItemSelection) {
         onSelect(pendingItemSelection);
@@ -103,6 +124,7 @@ const Column = memo(function Column({
         onEditHeader(headerTitle);
       } else {
         setHeaderTitle(title); // Reset to original if empty
+        onEditHeader(title);
       }
     } else if (e.key === 'Escape') {
       setHeaderTitle(title); // Reset to original
@@ -125,41 +147,30 @@ const Column = memo(function Column({
   return (
     <motion.div
       ref={setNodeRef}
-      className={`bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden ${
-        disabled ? 'opacity-50' : ''
-      } ${
+      className={`bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden ${disabled ? 'opacity-50' : ''} ${
         isOver ? 'ring-4 ring-primary-300 ring-opacity-50 bg-primary-25 border-primary-300' : ''
       }`}
       initial={{ opacity: 0, y: 10 }}
-      animate={{ 
-        opacity: 1, 
+      animate={{
+        opacity: 1,
         y: 0,
         scale: isOver ? 1.02 : 1,
         borderColor: isOver ? '#f97316' : '#e5e7eb'
       }}
-      transition={{ 
-        duration: 0.2,
-        scale: { duration: 0.15 },
-        borderColor: { duration: 0.15 }
-      }}
+      transition={{ duration: 0.2, scale: { duration: 0.15 }, borderColor: { duration: 0.15 } }}
       layout
     >
       {/* Column Header - Changed background gradient to be darker */}
-      <motion.div 
+      <motion.div
         className={`p-4 border-b border-gray-100 transition-all ${
-          isOver 
-            ? 'bg-gradient-to-r from-primary-200 to-primary-300' 
-            : 'bg-gradient-to-r from-primary-100 to-primary-200'
+          isOver ? 'bg-gradient-to-r from-primary-200 to-primary-300' : 'bg-gradient-to-r from-primary-100 to-primary-200'
         }`}
-        animate={{
-          backgroundColor: isOver ? '#fed7aa' : '#ffedd5'
-        }}
+        animate={{ backgroundColor: isOver ? '#fed7aa' : '#ffedd5' }}
         transition={{ duration: 0.15 }}
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 flex-1">
             <SafeIcon icon={FiGrid} className="text-primary-600 text-xl" />
-            
             {isEditingHeader ? (
               <input
                 ref={headerInputRef}
@@ -186,7 +197,7 @@ const Column = memo(function Column({
               </div>
             )}
           </div>
-          
+
           <div className="flex items-center gap-2">
             {!disabled && !showNewItemInput && (
               <motion.button
@@ -199,11 +210,9 @@ const Column = memo(function Column({
                 <SafeIcon icon={FiPlus} className="text-base" />
               </motion.button>
             )}
-            
             <span className="px-2 py-1 bg-primary-100 text-primary-700 rounded-lg text-sm font-medium">
               {count}
             </span>
-            
             {completedCount > 0 && (
               <span className="px-2 py-1 bg-success-100 text-success-700 rounded-lg text-sm font-medium">
                 ✓ {completedCount}
@@ -238,6 +247,28 @@ const Column = memo(function Column({
                   canBeStar={parentStarred}
                 />
               ))}
+
+              {/* New item input field */}
+              {showNewItemInput && !disabled && (
+                <motion.form
+                  onSubmit={handleNewItemSubmit}
+                  className="p-3 border-t border-gray-50"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <input
+                    ref={newItemInputRef}
+                    type="text"
+                    value={newItemTitle}
+                    onChange={(e) => setNewItemTitle(e.target.value)}
+                    onBlur={handleNewItemBlur}
+                    placeholder={`Add ${type}...`}
+                    className="w-full px-2 py-1 border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
+                  />
+                </motion.form>
+              )}
             </SortableContext>
           ) : (
             <motion.div
@@ -259,28 +290,6 @@ const Column = memo(function Column({
                 </div>
               )}
             </motion.div>
-          )}
-
-          {/* New item input field - moved to BOTTOM */}
-          {showNewItemInput && !disabled && (
-            <motion.form
-              onSubmit={handleNewItemSubmit}
-              className="p-3 border-t border-gray-50"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.15 }}
-            >
-              <input
-                type="text"
-                value={newItemTitle}
-                onChange={(e) => setNewItemTitle(e.target.value)}
-                onBlur={handleNewItemBlur}
-                placeholder={`Add ${type}...`}
-                className="w-full px-2 py-1 border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
-                autoFocus
-              />
-            </motion.form>
           )}
         </AnimatePresence>
       </div>
