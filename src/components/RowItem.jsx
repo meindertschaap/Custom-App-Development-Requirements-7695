@@ -1,11 +1,11 @@
-import React, {useState, useRef, useEffect, memo} from 'react';
-import {motion} from 'framer-motion';
+import React, { useState, useRef, useEffect, memo } from 'react';
+import { motion } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
-import {useSortable} from '@dnd-kit/sortable';
-import {CSS} from '@dnd-kit/utilities';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
-const {FiCheck, FiChevronRight, FiEdit2, FiTrash2, FiStar} = FiIcons;
+const { FiCheck, FiChevronRight, FiEdit2, FiTrash2, FiStar } = FiIcons;
 
 // Memoized RowItem component to prevent unnecessary re-renders
 const RowItem = memo(function RowItem({
@@ -26,13 +26,13 @@ const RowItem = memo(function RowItem({
   const [editMode, setEditMode] = useState(isEditing);
   const [editValue, setEditValue] = useState(item.title);
   const [showActions, setShowActions] = useState(false);
-  const [truncatedTitle, setTruncatedTitle] = useState(item.title);
+  const [isDeleting, setIsDeleting] = useState(false);
   const inputRef = useRef(null);
   const titleRef = useRef(null);
   const containerRef = useRef(null);
   const hoverTimeoutRef = useRef(null);
   const isHoveringRef = useRef(false);
-  
+
   // Set up sortable functionality - entire item is draggable with click-hold
   const {
     attributes,
@@ -72,6 +72,11 @@ const RowItem = memo(function RowItem({
     }
   }, [editMode]);
 
+  // Update editValue when item.title changes
+  useEffect(() => {
+    setEditValue(item.title);
+  }, [item.title]);
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -80,32 +85,6 @@ const RowItem = memo(function RowItem({
       }
     };
   }, []);
-
-  // Calculate and set truncated text only once when showActions changes
-  useEffect(() => {
-    if (!showActions || editMode || !titleRef.current) {
-      setTruncatedTitle(item.title);
-      return;
-    }
-    
-    // Calculate approximate characters that fit in two lines
-    const containerWidth = titleRef.current.clientWidth || 200;
-    const avgCharWidth = 8; // Approximate character width in pixels
-    const charsPerLine = Math.floor(containerWidth / avgCharWidth);
-    const maxCharsForTwoLines = charsPerLine * 2;
-    
-    // Reserve space for action buttons (approximately 15-20 characters worth)
-    const actionsReserve = canBeStar ? 20 : 15;
-    const availableChars = maxCharsForTwoLines - actionsReserve;
-    
-    if (item.title.length > availableChars && availableChars > 10) {
-      // Truncate to fit in two lines with ellipses
-      const truncated = item.title.slice(0, availableChars - 3) + '...';
-      setTruncatedTitle(truncated);
-    } else {
-      setTruncatedTitle(item.title);
-    }
-  }, [showActions, item.title, editMode, canBeStar]);
 
   const handleCheckboxClick = (e) => {
     e.stopPropagation();
@@ -125,8 +104,21 @@ const RowItem = memo(function RowItem({
 
   const handleDeleteClick = (e) => {
     e.stopPropagation();
-    if (window.confirm(`Are you sure you want to delete "${item.title}"?`)) {
-      onDelete();
+    e.preventDefault();
+    
+    // Ensure we have a delete handler
+    if (typeof onDelete !== 'function') {
+      console.error('Delete handler not provided');
+      return;
+    }
+    
+    const confirmed = window.confirm(`Are you sure you want to delete "${item.title}"?`);
+    if (confirmed) {
+      // Set deleting state immediately
+      setIsDeleting(true);
+      
+      // Call the delete handler immediately without delay
+      onDelete(item.id);
     }
   };
 
@@ -139,6 +131,7 @@ const RowItem = memo(function RowItem({
     e.stopPropagation();
     if (e.key === 'Enter') {
       if (editValue.trim()) {
+        // Call onEdit directly with the new value
         onEdit(editValue);
         setEditMode(false);
         if (onEditComplete) {
@@ -153,6 +146,7 @@ const RowItem = memo(function RowItem({
 
   const handleBlur = () => {
     if (editValue.trim()) {
+      // Call onEdit directly with the new value
       onEdit(editValue);
     } else {
       setEditValue(item.title);
@@ -175,13 +169,11 @@ const RowItem = memo(function RowItem({
   // Completely eliminate flickering with a more robust hover system
   const handleMouseEnter = () => {
     isHoveringRef.current = true;
-    
     // Clear any existing timeout
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
     }
-    
     // Use a single timeout to set the state to prevent rapid toggling
     hoverTimeoutRef.current = setTimeout(() => {
       if (isHoveringRef.current) {
@@ -189,16 +181,14 @@ const RowItem = memo(function RowItem({
       }
     }, 100);
   };
-  
+
   const handleMouseLeave = () => {
     isHoveringRef.current = false;
-    
     // Clear any pending timeout
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
     }
-    
     // Add a small delay before hiding to prevent flicker
     hoverTimeoutRef.current = setTimeout(() => {
       if (!isHoveringRef.current) {
@@ -209,6 +199,11 @@ const RowItem = memo(function RowItem({
 
   // Optimized to reduce animation load for large lists
   const staggerDelay = Math.min(0.05, 0.02 + (index * 0.001));
+
+  // Don't render if item is being deleted
+  if (isDeleting) {
+    return null;
+  }
 
   return (
     <motion.div
@@ -243,8 +238,9 @@ const RowItem = memo(function RowItem({
         layoutId: undefined // Remove layout animation that causes scrolling
       }}
       whileHover={!isDragging ? { x: 2 } : {}}
+      exit={{ opacity: 0, height: 0, marginBottom: 0, padding: 0 }}
     >
-      <div className="flex items-start gap-3 row-item-content">
+      <div className="flex items-start gap-3 row-item-content relative">
         {/* Checkbox */}
         <motion.button
           onClick={handleCheckboxClick}
@@ -257,8 +253,8 @@ const RowItem = memo(function RowItem({
           {item.completed && <SafeIcon icon={FiCheck} className="text-xs" />}
         </motion.button>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
+        {/* Content Container - relative positioning for overlay */}
+        <div className="flex-1 min-w-0 relative">
           {editMode ? (
             <input
               ref={inputRef}
@@ -273,76 +269,73 @@ const RowItem = memo(function RowItem({
               style={{ pointerEvents: 'auto' }}
             />
           ) : (
-            <div className="flex items-start justify-between gap-2">
-              <h4
-                ref={titleRef}
-                className={`text-base leading-relaxed ${
-                  item.completed ? 'text-gray-500 line-through' : 'text-gray-900'
-                } ${isSelected ? 'font-semibold' : 'font-normal'} flex items-center gap-1`}
-                style={{
-                  display: 'block',
-                  WebkitLineClamp: showActions ? 2 : 'unset',
-                  WebkitBoxOrient: showActions ? 'vertical' : 'unset',
-                  overflow: 'hidden'
-                }}
-              >
-                {item.starred && (
-                  <SafeIcon icon={FiStar} className="text-amber-500 flex-shrink-0" />
+            <>
+              {/* Title and Chevron Container */}
+              <div className="flex items-start justify-between gap-2">
+                <h4
+                  ref={titleRef}
+                  className={`text-base leading-relaxed ${
+                    item.completed ? 'text-gray-500 line-through' : 'text-gray-900'
+                  } ${isSelected ? 'font-semibold' : 'font-normal'} flex items-center gap-1 pr-2`}
+                >
+                  {item.starred && (
+                    <SafeIcon icon={FiStar} className="text-amber-500 flex-shrink-0" />
+                  )}
+                  {item.title}
+                </h4>
+                {!isLeaf && onSelect && (
+                  <SafeIcon
+                    icon={FiChevronRight}
+                    className={`text-gray-400 transition-transform flex-shrink-0 ${isSelected ? 'rotate-90' : ''}`}
+                  />
                 )}
-                {showActions ? truncatedTitle : item.title}
-              </h4>
-              {!isLeaf && onSelect && (
-                <SafeIcon
-                  icon={FiChevronRight}
-                  className={`text-gray-400 transition-transform ${isSelected ? 'rotate-90' : ''}`}
-                />
+              </div>
+
+              {/* Overlay Action Buttons - positioned absolutely */}
+              {!editMode && showActions && (
+                <motion.div
+                  className="absolute top-0 right-0 flex items-center gap-1 bg-white/95 backdrop-blur-sm rounded-lg px-2 py-1 shadow-lg border border-gray-200 z-10"
+                  initial={{ opacity: 0, scale: 0.9, x: 10 }}
+                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, x: 10 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  {canBeStar && (
+                    <motion.button
+                      onClick={handleStarClick}
+                      className={`p-1.5 ${
+                        item.starred ? 'text-amber-500' : 'text-gray-400 hover:text-amber-500'
+                      } hover:bg-amber-50 rounded transition-all`}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      title={item.starred ? "Unstar" : "Star"}
+                    >
+                      <SafeIcon icon={FiStar} className="text-sm" />
+                    </motion.button>
+                  )}
+                  <motion.button
+                    onClick={handleEditClick}
+                    className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-all"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    title="Edit"
+                  >
+                    <SafeIcon icon={FiEdit2} className="text-sm" />
+                  </motion.button>
+                  <motion.button
+                    onClick={handleDeleteClick}
+                    className="p-1.5 text-gray-400 hover:text-danger-600 hover:bg-danger-50 rounded transition-all"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    title="Delete"
+                  >
+                    <SafeIcon icon={FiTrash2} className="text-sm" />
+                  </motion.button>
+                </motion.div>
               )}
-            </div>
+            </>
           )}
         </div>
-
-        {/* Actions */}
-        {!editMode && showActions && (
-          <motion.div
-            className="flex items-center gap-1"
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 10 }}
-            transition={{ duration: 0.15 }}
-          >
-            {canBeStar && (
-              <motion.button
-                onClick={handleStarClick}
-                className={`p-1.5 ${
-                  item.starred ? 'text-amber-500' : 'text-gray-400 hover:text-amber-500'
-                } hover:bg-amber-50 rounded transition-all`}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                title={item.starred ? "Unstar" : "Star"}
-              >
-                <SafeIcon icon={FiStar} className="text-base" />
-              </motion.button>
-            )}
-            <motion.button
-              onClick={handleEditClick}
-              className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-all"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              title="Edit"
-            >
-              <SafeIcon icon={FiEdit2} className="text-base" />
-            </motion.button>
-            <motion.button
-              onClick={handleDeleteClick}
-              className="p-1.5 text-gray-400 hover:text-danger-600 hover:bg-danger-50 rounded transition-all"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              title="Delete"
-            >
-              <SafeIcon icon={FiTrash2} className="text-base" />
-            </motion.button>
-          </motion.div>
-        )}
       </div>
     </motion.div>
   );

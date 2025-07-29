@@ -6,20 +6,13 @@ import Column from './Column';
 import TopBar from './TopBar';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { v4 as uuidv4 } from 'uuid';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors
-} from '@dnd-kit/core';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { format } from 'date-fns';
 
 const { FiGrid, FiStar } = FiIcons;
 
-// Default empty template
+// Default empty template 
 const emptyTemplate = {
   columnHeaders: {
     goals: "Big Goals",
@@ -48,6 +41,8 @@ function Board({ useCase, onOpenUseCaseSelector }) {
   const [editingHeader, setEditingHeader] = useState(null); // Track which header is being edited
   const [activeDragData, setActiveDragData] = useState(null);
   const [lastUseCaseId, setLastUseCaseId] = useLocalStorage('brainstorm-last-use-case-id', null);
+  const [importedAppTitle, setImportedAppTitle] = useLocalStorage('brainstorm-imported-app-title', null);
+  const [importedAppSubtitle, setImportedAppSubtitle] = useLocalStorage('brainstorm-imported-app-subtitle', null);
 
   // Update column headers based on selected use case
   // Override custom headers when a NEW template is selected
@@ -55,7 +50,6 @@ function Board({ useCase, onOpenUseCaseSelector }) {
     if (useCase && useCase.columns) {
       // If this is a different use case than the last one, override any custom headers
       const isNewTemplate = useCase.id !== lastUseCaseId;
-      
       if (isNewTemplate) {
         setData(prevData => ({
           ...prevData,
@@ -68,12 +62,15 @@ function Board({ useCase, onOpenUseCaseSelector }) {
           // Reset the user edited flag when applying a new template
           userEditedHeaders: false
         }));
-        
         // Update the last use case ID
         setLastUseCaseId(useCase.id);
+        
+        // Clear any imported title/subtitle when selecting a new template
+        setImportedAppTitle(null);
+        setImportedAppSubtitle(null);
       }
     }
-  }, [useCase, setData, lastUseCaseId, setLastUseCaseId]);
+  }, [useCase, setData, lastUseCaseId, setLastUseCaseId, setImportedAppTitle, setImportedAppSubtitle]);
 
   // Configure DnD sensors with longer delay for click-hold
   const sensors = useSensors(
@@ -157,7 +154,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
     // Apply search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(item =>
+      filtered = filtered.filter(item => 
         item.title.toLowerCase().includes(query)
       );
     }
@@ -166,22 +163,22 @@ function Board({ useCase, onOpenUseCaseSelector }) {
   }, [filter, searchQuery, showStarredOnly]);
 
   // Memoized filtered data
-  const goals = useMemo(() =>
+  const goals = useMemo(() => 
     getFilteredItems(data?.goals || []),
     [data?.goals, getFilteredItems]
   );
 
-  const steps = useMemo(() =>
+  const steps = useMemo(() => 
     selectedGoal ? getFilteredItems(selectedGoal.steps || []) : [],
     [selectedGoal, getFilteredItems]
   );
 
-  const tasks = useMemo(() =>
+  const tasks = useMemo(() => 
     selectedStep ? getFilteredItems(selectedStep.tasks || []) : [],
     [selectedStep, getFilteredItems]
   );
 
-  const initiatives = useMemo(() =>
+  const initiatives = useMemo(() => 
     selectedTask ? getFilteredItems(selectedTask.initiatives || []) : [],
     [selectedTask, getFilteredItems]
   );
@@ -220,18 +217,19 @@ function Board({ useCase, onOpenUseCaseSelector }) {
             steps: []
           };
           updateData.goals.push(newGoal);
-          setSelectedGoal(newGoal); // Clear other selections when adding a new goal
+          setSelectedGoal(newGoal);
+          // Clear other selections when adding a new goal
           setSelectedStep(null);
           setSelectedTask(null);
           newItemId = newGoal.id;
           // Keep the input field open for the next entry
           setShowNewItemInputs(prev => ({ ...prev, goal: true }));
           break;
-
         case 'step':
           if (!selectedGoal) return updateData;
           const goalIndex = updateData.goals.findIndex(g => g.id === selectedGoal.id);
           if (goalIndex === -1) return updateData;
+
           if (!updateData.goals[goalIndex].steps) {
             updateData.goals[goalIndex].steps = [];
           }
@@ -253,13 +251,13 @@ function Board({ useCase, onOpenUseCaseSelector }) {
           // Keep the input field open for the next entry
           setShowNewItemInputs(prev => ({ ...prev, step: true }));
           break;
-
         case 'task':
           if (!selectedStep || !selectedGoal) return updateData;
           const gIndex = updateData.goals.findIndex(g => g.id === selectedGoal.id);
           if (gIndex === -1) return updateData;
           const sIndex = updateData.goals[gIndex].steps.findIndex(s => s.id === selectedStep.id);
           if (sIndex === -1) return updateData;
+
           if (!updateData.goals[gIndex].steps[sIndex].tasks) {
             updateData.goals[gIndex].steps[sIndex].tasks = [];
           }
@@ -280,7 +278,6 @@ function Board({ useCase, onOpenUseCaseSelector }) {
           // Keep the input field open for the next entry
           setShowNewItemInputs(prev => ({ ...prev, task: true }));
           break;
-
         case 'initiative':
           if (!selectedTask || !selectedStep || !selectedGoal) return updateData;
           const goalIdx = updateData.goals.findIndex(g => g.id === selectedGoal.id);
@@ -289,6 +286,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
           if (stepIdx === -1) return updateData;
           const taskIdx = updateData.goals[goalIdx].steps[stepIdx].tasks.findIndex(t => t.id === selectedTask.id);
           if (taskIdx === -1) return updateData;
+
           if (!updateData.goals[goalIdx].steps[stepIdx].tasks[taskIdx].initiatives) {
             updateData.goals[goalIdx].steps[stepIdx].tasks[taskIdx].initiatives = [];
           }
@@ -300,7 +298,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
             completed: false,
             starred: false,
             priority: (updateData.goals[goalIdx].steps[stepIdx].tasks[taskIdx].initiatives.length || 0) + 1,
-            orderIndex: (updateData.goals[goalIdx].steps[stepIdx].tasks[taskIdx].initiatives.length || 0) + 1
+            orderIndex: (updateData.goals[goalIdx].steps[stepIdx].tasks[taskIdx].initiatives.length || 0) + 1,
           };
           updateData.goals[goalIdx].steps[stepIdx].tasks[taskIdx].initiatives.push(newInitiative);
           newItemId = newInitiative.id;
@@ -311,7 +309,10 @@ function Board({ useCase, onOpenUseCaseSelector }) {
 
       // Set the newly created item as the one being edited if no title provided
       if (newItemId && !title) {
-        setEditingNewItem({ id: newItemId, type: type });
+        setEditingNewItem({
+          id: newItemId,
+          type: type
+        });
       }
 
       return updateData;
@@ -322,6 +323,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
   const editItemTitle = useCallback((id, type, newTitle) => {
     setData(prevData => {
       const updateData = { ...prevData };
+
       const findAndUpdate = (items, id) => {
         const index = items.findIndex(i => i.id === id);
         if (index !== -1) {
@@ -388,13 +390,12 @@ function Board({ useCase, onOpenUseCaseSelector }) {
       if (!updateData.columnHeaders) {
         updateData.columnHeaders = { ...emptyTemplate.columnHeaders };
       }
-      
+
       // Update the column header with the new title
       updateData.columnHeaders[type] = newTitle;
-      
       // Mark that the user has edited headers to prevent template overrides
       updateData.userEditedHeaders = true;
-      
+
       return updateData;
     });
     setEditingHeader(null); // Clear editing state
@@ -404,6 +405,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
   const toggleStarred = useCallback((itemId, type) => {
     setData(prevData => {
       const updateData = { ...prevData };
+
       const findAndToggle = (items, id) => {
         const index = items.findIndex(i => i.id === id);
         if (index !== -1) {
@@ -540,7 +542,6 @@ function Board({ useCase, onOpenUseCaseSelector }) {
             setCompletionStatus(updateData.goals[goalIndex], newStatus);
           }
           break;
-
         case 'step':
           for (const goal of updateData.goals) {
             if (!goal.steps) continue;
@@ -552,7 +553,6 @@ function Board({ useCase, onOpenUseCaseSelector }) {
             }
           }
           break;
-
         case 'task':
           for (const goal of updateData.goals) {
             if (!goal.steps) continue;
@@ -570,7 +570,6 @@ function Board({ useCase, onOpenUseCaseSelector }) {
             if (found) break;
           }
           break;
-
         case 'initiative':
           for (const goal of updateData.goals) {
             if (!goal.steps) continue;
@@ -611,7 +610,6 @@ function Board({ useCase, onOpenUseCaseSelector }) {
             setSelectedTask(null);
           }
           break;
-
         case 'step':
           for (let i = 0; i < updateData.goals.length; i++) {
             const goal = updateData.goals[i];
@@ -624,7 +622,6 @@ function Board({ useCase, onOpenUseCaseSelector }) {
             setSelectedTask(null);
           }
           break;
-
         case 'task':
           for (let i = 0; i < updateData.goals.length; i++) {
             const goal = updateData.goals[i];
@@ -640,7 +637,6 @@ function Board({ useCase, onOpenUseCaseSelector }) {
             setSelectedTask(null);
           }
           break;
-
         case 'initiative':
           for (let i = 0; i < updateData.goals.length; i++) {
             const goal = updateData.goals[i];
@@ -675,7 +671,15 @@ function Board({ useCase, onOpenUseCaseSelector }) {
 
     // Create the full filename with date
     const fullFilename = `${customFilename}-${formattedDate}`;
-    const dataStr = JSON.stringify(data, null, 2);
+
+    // Add app title and subtitle to the data before exporting
+    const exportData = {
+      ...data,
+      appTitle: importedAppTitle || useCase?.title || "Brainstorm Planner",
+      appSubtitle: importedAppSubtitle || useCase?.description || "Break big ideas into clear steps - your way"
+    };
+
+    const dataStr = JSON.stringify(exportData, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
@@ -683,7 +687,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
     link.download = `${fullFilename}.json`;
     link.click();
     URL.revokeObjectURL(url);
-  }, [data]);
+  }, [data, useCase, importedAppTitle, importedAppSubtitle]);
 
   // Import data
   const handleImport = useCallback((event) => {
@@ -693,7 +697,18 @@ function Board({ useCase, onOpenUseCaseSelector }) {
       reader.onload = (e) => {
         try {
           const importedData = JSON.parse(e.target.result);
-          setData(importedData);
+          
+          // Extract appTitle and appSubtitle from the imported data
+          const { appTitle, appSubtitle, ...dataToStore } = importedData;
+          
+          // Store the imported app title and subtitle
+          if (appTitle) setImportedAppTitle(appTitle);
+          if (appSubtitle) setImportedAppSubtitle(appSubtitle);
+          
+          // Set the data without appTitle and appSubtitle
+          setData(dataToStore);
+          
+          // Reset selections
           setSelectedGoal(null);
           setSelectedStep(null);
           setSelectedTask(null);
@@ -703,7 +718,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
       };
       reader.readAsText(file);
     }
-  }, [setData]);
+  }, [setData, setImportedAppTitle, setImportedAppSubtitle]);
 
   // Reset to empty template
   const handleReset = useCallback(() => {
@@ -717,8 +732,12 @@ function Board({ useCase, onOpenUseCaseSelector }) {
       setSelectedGoal(null);
       setSelectedStep(null);
       setSelectedTask(null);
+      
+      // Clear any imported app title and subtitle
+      setImportedAppTitle(null);
+      setImportedAppSubtitle(null);
     }
-  }, [setData]);
+  }, [setData, setImportedAppTitle, setImportedAppSubtitle]);
 
   // Toggle starred items filter
   const handleToggleStarredFilter = useCallback(() => {
@@ -729,18 +748,23 @@ function Board({ useCase, onOpenUseCaseSelector }) {
   const handleCopy = useCallback(() => {
     const generateIndentedOutline = (data) => {
       let outline = '';
+      
       (data?.goals || []).forEach(goal => {
         outline += `${goal.title}${goal.completed ? ' ✓' : ''}${goal.starred ? ' ★' : ''}\n`;
+        
         (goal.steps || []).forEach(step => {
           outline += `  ${step.title}${step.completed ? ' ✓' : ''}${step.starred ? ' ★' : ''}\n`;
+          
           (step.tasks || []).forEach(task => {
             outline += `    ${task.title}${task.completed ? ' ✓' : ''}${task.starred ? ' ★' : ''}\n`;
+            
             (task.initiatives || []).forEach(initiative => {
               outline += `      ${initiative.title}${initiative.completed ? ' ✓' : ''}${initiative.starred ? ' ★' : ''}\n`;
             });
           });
         });
       });
+      
       return outline.trim();
     };
 
@@ -779,6 +803,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
           // Find active and over item indices
           const goalActiveIndex = newData.goals.findIndex(g => g.id === activeId);
           const goalOverIndex = newData.goals.findIndex(g => g.id === overId);
+          
           if (goalActiveIndex !== -1 && goalOverIndex !== -1) {
             // Reorder goals
             newData.goals = arrayMove(
@@ -786,14 +811,14 @@ function Board({ useCase, onOpenUseCaseSelector }) {
               goalActiveIndex,
               goalOverIndex
             );
-
+            
             // Update order indices
             newData.goals.forEach((goal, idx) => {
               goal.orderIndex = idx + 1;
             });
           }
           break;
-
+          
         case 'step':
           // Handle step reordering
           if (selectedGoal) {
@@ -802,6 +827,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
               const steps = newData.goals[goalIndex].steps;
               const stepActiveIndex = steps.findIndex(s => s.id === activeId);
               const stepOverIndex = steps.findIndex(s => s.id === overId);
+              
               if (stepActiveIndex !== -1 && stepOverIndex !== -1) {
                 // Reorder steps
                 newData.goals[goalIndex].steps = arrayMove(
@@ -809,7 +835,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
                   stepActiveIndex,
                   stepOverIndex
                 );
-
+                
                 // Update order indices
                 newData.goals[goalIndex].steps.forEach((step, idx) => {
                   step.orderIndex = idx + 1;
@@ -818,7 +844,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
             }
           }
           break;
-
+          
         case 'task':
           // Handle task reordering
           if (selectedGoal && selectedStep) {
@@ -829,6 +855,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
                 const tasks = newData.goals[goalIndex].steps[stepIndex].tasks;
                 const taskActiveIndex = tasks.findIndex(t => t.id === activeId);
                 const taskOverIndex = tasks.findIndex(t => t.id === overId);
+                
                 if (taskActiveIndex !== -1 && taskOverIndex !== -1) {
                   // Reorder tasks
                   newData.goals[goalIndex].steps[stepIndex].tasks = arrayMove(
@@ -836,7 +863,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
                     taskActiveIndex,
                     taskOverIndex
                   );
-
+                  
                   // Update order indices
                   newData.goals[goalIndex].steps[stepIndex].tasks.forEach((task, idx) => {
                     task.orderIndex = idx + 1;
@@ -846,7 +873,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
             }
           }
           break;
-
+          
         case 'initiative':
           // Handle initiative reordering
           if (selectedGoal && selectedStep && selectedTask) {
@@ -859,6 +886,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
                   const initiatives = newData.goals[goalIndex].steps[stepIndex].tasks[taskIndex].initiatives;
                   const initiativeActiveIndex = initiatives.findIndex(i => i.id === activeId);
                   const initiativeOverIndex = initiatives.findIndex(i => i.id === overId);
+                  
                   if (initiativeActiveIndex !== -1 && initiativeOverIndex !== -1) {
                     // Reorder initiatives
                     newData.goals[goalIndex].steps[stepIndex].tasks[taskIndex].initiatives = arrayMove(
@@ -866,7 +894,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
                       initiativeActiveIndex,
                       initiativeOverIndex
                     );
-
+                    
                     // Update order indices
                     newData.goals[goalIndex].steps[stepIndex].tasks[taskIndex].initiatives.forEach((initiative, idx) => {
                       initiative.orderIndex = idx + 1;
@@ -885,9 +913,10 @@ function Board({ useCase, onOpenUseCaseSelector }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopBar
-        title={useCase?.title || "Brainstorm Planner"}
-        filter={filter}
+      <TopBar 
+        title={importedAppTitle || useCase?.title || "Brainstorm Planner"}
+        subtitle={importedAppSubtitle || useCase?.description}
+        filter={filter} 
         setFilter={setFilter}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
@@ -901,23 +930,23 @@ function Board({ useCase, onOpenUseCaseSelector }) {
         onOpenUseCaseSelector={onOpenUseCaseSelector}
         useCase={useCase}
       />
-
+      
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <DndContext
+        <DndContext 
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <motion.div
+          <motion.div 
             className="grid grid-cols-1 lg:grid-cols-4 gap-6"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.2 }}
           >
-            <Column
-              title={data?.columnHeaders?.goals || "Column 1"}
-              items={goals}
+            <Column 
+              title={data?.columnHeaders?.goals || "Column 1"} 
+              items={goals} 
               onSelect={handleGoalSelect}
               onToggleCompletion={(id) => toggleCompletion(id, 'goal')}
               onToggleStarred={(id) => toggleStarred(id, 'goal')}
@@ -932,10 +961,10 @@ function Board({ useCase, onOpenUseCaseSelector }) {
               onEditHeader={(newTitle) => editColumnHeader('goals', newTitle)}
               onStartEditingHeader={() => setEditingHeader('goals')}
             />
-
-            <Column
-              title={data?.columnHeaders?.steps || "Column 2"}
-              items={steps}
+            
+            <Column 
+              title={data?.columnHeaders?.steps || "Column 2"} 
+              items={steps} 
               onSelect={handleStepSelect}
               onToggleCompletion={(id) => toggleCompletion(id, 'step')}
               onToggleStarred={(id) => toggleStarred(id, 'step')}
@@ -951,10 +980,10 @@ function Board({ useCase, onOpenUseCaseSelector }) {
               onEditHeader={(newTitle) => editColumnHeader('steps', newTitle)}
               onStartEditingHeader={() => setEditingHeader('steps')}
             />
-
-            <Column
-              title={data?.columnHeaders?.tasks || "Column 3"}
-              items={tasks}
+            
+            <Column 
+              title={data?.columnHeaders?.tasks || "Column 3"} 
+              items={tasks} 
               onSelect={handleTaskSelect}
               onToggleCompletion={(id) => toggleCompletion(id, 'task')}
               onToggleStarred={(id) => toggleStarred(id, 'task')}
@@ -970,10 +999,10 @@ function Board({ useCase, onOpenUseCaseSelector }) {
               onEditHeader={(newTitle) => editColumnHeader('tasks', newTitle)}
               onStartEditingHeader={() => setEditingHeader('tasks')}
             />
-
-            <Column
-              title={data?.columnHeaders?.initiatives || "Column 4"}
-              items={initiatives}
+            
+            <Column 
+              title={data?.columnHeaders?.initiatives || "Column 4"} 
+              items={initiatives} 
               onToggleCompletion={(id) => toggleCompletion(id, 'initiative')}
               onToggleStarred={(id) => toggleStarred(id, 'initiative')}
               onAdd={(title) => addNewItem('initiative', title)}
@@ -991,12 +1020,12 @@ function Board({ useCase, onOpenUseCaseSelector }) {
           </motion.div>
         </DndContext>
       </div>
-
+      
       <div className="py-4 px-6 bg-white border-t border-gray-200 text-center text-xs text-gray-500">
         <div className="flex justify-center items-center gap-2">
-          <img
-            src="https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1753623889058-WWSC%20Logo%20Transparent.png"
-            alt="WWSC Logo"
+          <img 
+            src="https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1753623889058-WWSC%20Logo%20Transparent.png" 
+            alt="WWSC Logo" 
             className="h-6 w-auto"
           />
           <p>Brainstorm Planner App © {new Date().getFullYear()} - StreetRise International</p>

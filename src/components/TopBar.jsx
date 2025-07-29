@@ -8,6 +8,7 @@ const { FiSearch, FiDownload, FiUpload, FiCopy, FiRefreshCw, FiStar, FiGrid, FiL
 // Memoized TopBar component to prevent unnecessary re-renders
 const TopBar = memo(function TopBar({
   title = "Brainstorm Planner",
+  subtitle,
   filter,
   setFilter,
   searchQuery,
@@ -22,33 +23,25 @@ const TopBar = memo(function TopBar({
   onOpenUseCaseSelector,
   useCase
 }) {
-  // Get the appropriate subtitle based on the current use case
+  // Get the appropriate subtitle based on the current use case or provided subtitle
   const getSubtitle = () => {
+    if (subtitle) return subtitle;
     if (!useCase) return "Break big ideas into clear steps - your way";
     
     switch (useCase.id) {
-      case 'goal-to-action':
-        return "Break big goals into actionable steps";
-      case 'skills-practice':
-        return "Master new skills through structured practice";
-      case 'event-workshop':
-        return "Organize multi-day events with detailed sessions";
-      case 'trip-planner':
-        return "Plan your perfect trip with all details covered";
-      case 'workshop-planner':
-        return "Design engaging workshops with clear objectives";
-      case 'meeting-minutes':
-        return "Track meetings, decisions and follow-up actions";
-      case 'article-writing':
-        return "Structure your writing with supporting evidence";
-      case 'life-area-planning':
-        return "Balance and improve different areas of your life";
-      case 'problem-solver':
-        return "Break down problems into actionable solutions";
-      case 'custom-flow':
-        return "Create your own unique planning structure";
-      default:
-        return "Break big ideas into clear steps - your way";
+      case 'goal-to-action': return "Break big goals into actionable steps";
+      case 'skills-practice': return "Master new skills through structured practice";
+      case 'event-workshop': return "Organize multi-day events with detailed sessions";
+      case 'trip-planner': return "Plan your perfect trip with all details covered";
+      case 'workshop-planner': return "Design engaging workshops with clear objectives";
+      case 'meeting-minutes': return "Track meetings, decisions and follow-up actions";
+      case 'article-writing': return "Structure your writing with supporting evidence";
+      case 'life-area-planning': return "Balance and improve different areas of your life";
+      case 'problem-solver': return "Break down problems into actionable solutions";
+      case 'okr-planner': return "Align organizational objectives with measurable key results";
+      case 'two-year-planner': return "Map your long-term vision into incremental progress steps";
+      case 'custom-flow': return "Create your own unique planning structure";
+      default: return "Break big ideas into clear steps - your way";
     }
   };
 
@@ -59,10 +52,10 @@ const TopBar = memo(function TopBar({
           {/* Title and Logo */}
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-3">
-              <img
-                src="https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1753623889058-WWSC%20Logo%20Transparent.png"
-                alt="WWSC Logo"
-                className="h-12 w-auto"
+              <img 
+                src="https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1753623889058-WWSC%20Logo%20Transparent.png" 
+                alt="WWSC Logo" 
+                className="h-12 w-auto" 
                 loading="lazy"
               />
               <div>
@@ -71,7 +64,6 @@ const TopBar = memo(function TopBar({
                 </h1>
                 <p className="text-base text-primary-600">{getSubtitle()}</p>
               </div>
-              
               <motion.button
                 onClick={onOpenUseCaseSelector}
                 className="ml-2 px-3 py-1.5 bg-primary-100 text-primary-700 hover:bg-primary-200 rounded-lg transition-all flex items-center gap-1.5"
@@ -84,10 +76,7 @@ const TopBar = memo(function TopBar({
               </motion.button>
             </div>
             <div className="relative max-w-md">
-              <SafeIcon
-                icon={FiSearch}
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-xl"
-              />
+              <SafeIcon icon={FiSearch} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-xl" />
               <input
                 type="text"
                 placeholder="Search items..."
@@ -134,10 +123,7 @@ const TopBar = memo(function TopBar({
               whileTap={{ scale: 0.95 }}
               title={showStarredOnly ? "Show All Items" : "Show Starred Items"}
             >
-              <SafeIcon
-                icon={FiStar}
-                className={`text-xl ${showStarredOnly ? 'fill-current' : ''}`}
-              />
+              <SafeIcon icon={FiStar} className={`text-xl ${showStarredOnly ? 'fill-current' : ''}`} />
             </motion.button>
             <motion.button
               onClick={onExport}
@@ -155,12 +141,7 @@ const TopBar = memo(function TopBar({
               title="Upload Data"
             >
               <SafeIcon icon={FiUpload} className="text-xl" />
-              <input
-                type="file"
-                accept=".json"
-                onChange={onImport}
-                className="hidden"
-              />
+              <input type="file" accept=".json" onChange={onImport} className="hidden" />
             </motion.label>
             <motion.button
               onClick={onCopy}

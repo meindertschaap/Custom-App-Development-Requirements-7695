@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 
-const { FiTarget, FiBookOpen, FiCalendar, FiMapPin, FiUsers, FiFileText, FiEdit, FiHeart, FiTool, FiSettings, FiX, FiCheck, FiArrowRight } = FiIcons;
+const { FiTarget, FiBookOpen, FiCalendar, FiMapPin, FiUsers, FiFileText, FiEdit, FiHeart, FiTool, FiSettings, FiX, FiCheck, FiArrowRight, FiTrendingUp, FiClock } = FiIcons;
 
 const USE_CASES = [
   {
@@ -103,10 +103,10 @@ const USE_CASES = [
     icon: FiHeart,
     description: 'Balance and improve different areas of your life',
     columns: {
-      goals: 'Life Domains',
-      steps: 'Top Focus Areas',
-      tasks: 'Broad Strategy',
-      initiatives: 'Actions & Habits'
+      goals: 'Life Areas',
+      steps: 'Goals',
+      tasks: 'Milestones',
+      initiatives: 'Actions'
     },
     color: 'from-green-500 to-emerald-600'
   },
@@ -122,6 +122,32 @@ const USE_CASES = [
       initiatives: 'Next Actions'
     },
     color: 'from-red-500 to-rose-600'
+  },
+  {
+    id: 'okr-planner',
+    title: 'OKR Planner',
+    icon: FiTrendingUp,
+    description: 'Align organizational objectives with measurable key results',
+    columns: {
+      goals: 'Orgl. YR Goals',
+      steps: 'Team Subs (trim.)',
+      tasks: 'Key Results (trim.)',
+      initiatives: 'Initiatives'
+    },
+    color: 'from-blue-400 to-indigo-500'
+  },
+  {
+    id: 'two-year-planner',
+    title: 'Two-Year Goals\' Planner',
+    icon: FiClock,
+    description: 'Map your long-term vision into incremental progress steps',
+    columns: {
+      goals: '2-Year Goals',
+      steps: '6-Month Subs',
+      tasks: '6-Week Milestones',
+      initiatives: 'NextActions'
+    },
+    color: 'from-violet-400 to-purple-500'
   },
   {
     id: 'custom-flow',
@@ -181,13 +207,13 @@ function UseCaseSelector({ isOpen, onClose, onSelectUseCase }) {
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
       {/* Backdrop */}
       <motion.div 
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm" 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
       />
-
+      
       {/* Modal */}
       <motion.div 
         className="relative bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
@@ -202,7 +228,7 @@ function UseCaseSelector({ isOpen, onClose, onSelectUseCase }) {
             <h2 className="text-xl font-bold text-gray-900">Choose Your Planning Template</h2>
             <p className="text-sm text-gray-600">Select a template that best fits your planning needs</p>
           </div>
-          <motion.button
+          <motion.button 
             onClick={onClose}
             className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
             whileHover={{ scale: 1.1 }}
@@ -211,7 +237,7 @@ function UseCaseSelector({ isOpen, onClose, onSelectUseCase }) {
             <SafeIcon icon={FiX} className="text-xl" />
           </motion.button>
         </div>
-
+        
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           <AnimatePresence mode="wait">
@@ -227,8 +253,8 @@ function UseCaseSelector({ isOpen, onClose, onSelectUseCase }) {
                   <motion.div
                     key={useCase.id}
                     className={`relative overflow-hidden rounded-xl border-2 cursor-pointer transition-all ${
-                      selectedCase.id === useCase.id 
-                        ? 'border-primary-500 ring-2 ring-primary-300 shadow-md' 
+                      selectedCase.id === useCase.id
+                        ? 'border-primary-500 ring-2 ring-primary-300 shadow-md'
                         : 'border-gray-200 hover:border-primary-300'
                     }`}
                     onClick={() => handleSelectUseCase(useCase)}
@@ -244,13 +270,16 @@ function UseCaseSelector({ isOpen, onClose, onSelectUseCase }) {
                           <SafeIcon icon={FiCheck} className="text-sm" />
                         </div>
                       )}
+                      
                       <div className="flex items-center gap-3 mb-3">
                         <div className={`p-2 rounded-lg bg-gradient-to-br ${useCase.color} text-white`}>
                           <SafeIcon icon={useCase.icon} className="text-xl" />
                         </div>
                         <h3 className="font-semibold text-gray-900">{useCase.title}</h3>
                       </div>
+                      
                       <p className="text-sm text-gray-600 mb-3">{useCase.description}</p>
+                      
                       {!useCase.isCustom && (
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           {Object.entries(useCase.columns).map(([key, value]) => (
@@ -260,6 +289,7 @@ function UseCaseSelector({ isOpen, onClose, onSelectUseCase }) {
                           ))}
                         </div>
                       )}
+                      
                       {useCase.isCustom && (
                         <div className="text-center mt-2">
                           <span className="text-primary-600 text-sm">Create your own columns →</span>
@@ -281,6 +311,7 @@ function UseCaseSelector({ isOpen, onClose, onSelectUseCase }) {
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">Custom Column Headers</h3>
                   <p className="text-sm text-gray-600">Name each column in your custom planning flow</p>
                 </div>
+                
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -294,6 +325,7 @@ function UseCaseSelector({ isOpen, onClose, onSelectUseCase }) {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     />
                   </div>
+                  
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Column 2
@@ -306,6 +338,7 @@ function UseCaseSelector({ isOpen, onClose, onSelectUseCase }) {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     />
                   </div>
+                  
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Column 3
@@ -318,6 +351,7 @@ function UseCaseSelector({ isOpen, onClose, onSelectUseCase }) {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     />
                   </div>
+                  
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Column 4 (rightmost)
@@ -331,6 +365,7 @@ function UseCaseSelector({ isOpen, onClose, onSelectUseCase }) {
                     />
                   </div>
                 </div>
+                
                 <div className="mt-6 flex justify-between">
                   <motion.button 
                     onClick={() => setShowCustomForm(false)}
@@ -345,7 +380,7 @@ function UseCaseSelector({ isOpen, onClose, onSelectUseCase }) {
             )}
           </AnimatePresence>
         </div>
-
+        
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
           <div className="text-sm text-gray-600">
@@ -357,8 +392,7 @@ function UseCaseSelector({ isOpen, onClose, onSelectUseCase }) {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            Get Started
-            <SafeIcon icon={FiArrowRight} />
+            Get Started <SafeIcon icon={FiArrowRight} />
           </motion.button>
         </div>
       </motion.div>
