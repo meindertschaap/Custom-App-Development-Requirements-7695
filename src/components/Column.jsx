@@ -26,7 +26,8 @@ const Column = memo(function Column({
   parentStarred = true,
   isEditingHeader = false,
   onEditHeader,
-  onStartEditingHeader
+  onStartEditingHeader,
+  forceRefresh = false
 }) {
   const count = items?.length || 0;
   const completedCount = items?.filter(item => item.completed).length || 0;
@@ -34,6 +35,7 @@ const Column = memo(function Column({
   const [newItemTitle, setNewItemTitle] = useState("");
   const [pendingItemSelection, setPendingItemSelection] = useState(null);
   const [headerTitle, setHeaderTitle] = useState(title);
+  const [refreshKey, setRefreshKey] = useState(0);
   const headerInputRef = useRef(null);
   const newItemInputRef = useRef(null);
 
@@ -56,12 +58,24 @@ const Column = memo(function Column({
     }
   }, [isEditingHeader]);
 
-  // Focus the new item input when it becomes visible
+  // Focus the new item input when it becomes visible - with proper timing
   useEffect(() => {
     if (showNewItemInput && newItemInputRef.current) {
-      newItemInputRef.current.focus();
+      // Use requestAnimationFrame to ensure DOM is fully updated
+      requestAnimationFrame(() => {
+        if (newItemInputRef.current) {
+          newItemInputRef.current.focus();
+        }
+      });
     }
   }, [showNewItemInput]);
+
+  // Force refresh when forceRefresh changes
+  useEffect(() => {
+    if (forceRefresh) {
+      setRefreshKey(prev => prev + 1);
+    }
+  }, [forceRefresh]);
 
   const handleAddItem = () => {
     if (disabled) return;
@@ -73,15 +87,20 @@ const Column = memo(function Column({
     e.preventDefault();
     if (newItemTitle.trim()) {
       onAdd(newItemTitle);
-      // Keep the input field open for the next entry
+      // Clear the input but keep it open and focused
       setNewItemTitle("");
-      
-      // Ensure focus returns to the input field
+      // Ensure focus stays in the input field using multiple methods
+      requestAnimationFrame(() => {
+        if (newItemInputRef.current) {
+          newItemInputRef.current.focus();
+        }
+      });
+      // Backup focus attempt
       setTimeout(() => {
         if (newItemInputRef.current) {
           newItemInputRef.current.focus();
         }
-      }, 0);
+      }, 10);
     }
   };
 
@@ -90,17 +109,24 @@ const Column = memo(function Column({
       onAdd(newItemTitle);
       setNewItemTitle("");
       
-      // Process any pending item selection after closing the input
+      // If there's a pending item selection, process it
       if (pendingItemSelection) {
-        onSelect(pendingItemSelection);
+        onSelect && onSelect(pendingItemSelection);
         setPendingItemSelection(null);
       }
+      
+      // Keep the input field open and focused after adding
+      requestAnimationFrame(() => {
+        if (newItemInputRef.current) {
+          newItemInputRef.current.focus();
+        }
+      });
     } else {
       setShowNewItemInput(false);
       
-      // Process any pending item selection after closing the input
+      // If there's a pending item selection, process it
       if (pendingItemSelection) {
-        onSelect(pendingItemSelection);
+        onSelect && onSelect(pendingItemSelection);
         setPendingItemSelection(null);
       }
     }
@@ -108,14 +134,8 @@ const Column = memo(function Column({
 
   // Handle selection while ensuring input is properly closed first
   const handleItemSelect = (item) => {
-    if (showNewItemInput) {
-      // Store the selection to process after the input closes
-      setPendingItemSelection(item);
-      setShowNewItemInput(false);
-    } else {
-      // Process selection immediately if input isn't open
-      onSelect(item);
-    }
+    // Process selection immediately without storing it as pending
+    onSelect && onSelect(item);
   };
 
   const handleHeaderInputKeyDown = (e) => {
@@ -144,12 +164,17 @@ const Column = memo(function Column({
   // Create sortable item IDs for dnd-kit
   const itemIds = items ? items.map(item => item.id) : [];
 
+  // Generate proper placeholder text based on column title
+  const getPlaceholderText = () => {
+    return `Add ${title.toLowerCase().replace(/s$/, '')}...`;
+  };
+
   return (
     <motion.div
       ref={setNodeRef}
-      className={`bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden ${disabled ? 'opacity-50' : ''} ${
-        isOver ? 'ring-4 ring-primary-300 ring-opacity-50 bg-primary-25 border-primary-300' : ''
-      }`}
+      className={`bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden ${
+        disabled ? 'opacity-50' : ''
+      } ${isOver ? 'ring-4 ring-primary-300 ring-opacity-50 bg-primary-25 border-primary-300' : ''}`}
       initial={{ opacity: 0, y: 10 }}
       animate={{
         opacity: 1,
@@ -159,11 +184,14 @@ const Column = memo(function Column({
       }}
       transition={{ duration: 0.2, scale: { duration: 0.15 }, borderColor: { duration: 0.15 } }}
       layout
+      key={`column-${type}-${refreshKey}`}
     >
       {/* Column Header - Changed background gradient to be darker */}
       <motion.div
         className={`p-4 border-b border-gray-100 transition-all ${
-          isOver ? 'bg-gradient-to-r from-primary-200 to-primary-300' : 'bg-gradient-to-r from-primary-100 to-primary-200'
+          isOver
+            ? 'bg-gradient-to-r from-primary-200 to-primary-300'
+            : 'bg-gradient-to-r from-primary-100 to-primary-200'
         }`}
         animate={{ backgroundColor: isOver ? '#fed7aa' : '#ffedd5' }}
         transition={{ duration: 0.15 }}
@@ -197,7 +225,6 @@ const Column = memo(function Column({
               </div>
             )}
           </div>
-
           <div className="flex items-center gap-2">
             {!disabled && !showNewItemInput && (
               <motion.button
@@ -229,7 +256,7 @@ const Column = memo(function Column({
             <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
               {items?.map((item, index) => (
                 <RowItem
-                  key={item.id}
+                  key={`${item.id}-${refreshKey}`}
                   item={item}
                   onSelect={onSelect ? () => handleItemSelect(item) : undefined}
                   onToggleCompletion={() => onToggleCompletion(item.id)}
@@ -264,8 +291,9 @@ const Column = memo(function Column({
                     value={newItemTitle}
                     onChange={(e) => setNewItemTitle(e.target.value)}
                     onBlur={handleNewItemBlur}
-                    placeholder={`Add ${type}...`}
+                    placeholder={getPlaceholderText()}
                     className="w-full px-2 py-1 border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
+                    autoFocus
                   />
                 </motion.form>
               )}
@@ -286,7 +314,7 @@ const Column = memo(function Column({
               ) : (
                 <div className="space-y-2">
                   <SafeIcon icon={FiGrid} className="text-3xl mx-auto text-gray-300" />
-                  <p className="text-base">{onAdd ? `Click + to add a new ${type}` : 'No items found'}</p>
+                  <p className="text-base">{onAdd ? `Click + to add a new ${title.toLowerCase().replace(/s$/, '')}` : 'No items found'}</p>
                 </div>
               )}
             </motion.div>

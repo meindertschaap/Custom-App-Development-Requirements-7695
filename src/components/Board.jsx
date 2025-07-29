@@ -43,6 +43,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
   const [lastUseCaseId, setLastUseCaseId] = useLocalStorage('brainstorm-last-use-case-id', null);
   const [importedAppTitle, setImportedAppTitle] = useLocalStorage('brainstorm-imported-app-title', null);
   const [importedAppSubtitle, setImportedAppSubtitle] = useLocalStorage('brainstorm-imported-app-subtitle', null);
+  const [forceRefresh, setForceRefresh] = useState(0); // Force refresh counter
 
   // Update column headers based on selected use case
   // Override custom headers when a NEW template is selected
@@ -162,25 +163,25 @@ function Board({ useCase, onOpenUseCaseSelector }) {
     return filtered;
   }, [filter, searchQuery, showStarredOnly]);
 
-  // Memoized filtered data
+  // Memoized filtered data with force refresh dependency
   const goals = useMemo(() => 
     getFilteredItems(data?.goals || []),
-    [data?.goals, getFilteredItems]
+    [data?.goals, getFilteredItems, forceRefresh]
   );
 
   const steps = useMemo(() => 
     selectedGoal ? getFilteredItems(selectedGoal.steps || []) : [],
-    [selectedGoal, getFilteredItems]
+    [selectedGoal, getFilteredItems, forceRefresh]
   );
 
   const tasks = useMemo(() => 
     selectedStep ? getFilteredItems(selectedStep.tasks || []) : [],
-    [selectedStep, getFilteredItems]
+    [selectedStep, getFilteredItems, forceRefresh]
   );
 
   const initiatives = useMemo(() => 
     selectedTask ? getFilteredItems(selectedTask.initiatives || []) : [],
-    [selectedTask, getFilteredItems]
+    [selectedTask, getFilteredItems, forceRefresh]
   );
 
   // Handle item selection
@@ -197,6 +198,11 @@ function Board({ useCase, onOpenUseCaseSelector }) {
 
   const handleTaskSelect = useCallback((task) => {
     setSelectedTask(task);
+  }, []);
+
+  // Force refresh helper
+  const triggerForceRefresh = useCallback(() => {
+    setForceRefresh(prev => prev + 1);
   }, []);
 
   // Add new items - optimized with useCallback to prevent recreation
@@ -317,7 +323,10 @@ function Board({ useCase, onOpenUseCaseSelector }) {
 
       return updateData;
     });
-  }, [selectedGoal, selectedStep, selectedTask, setData]);
+
+    // Force refresh to ensure immediate display
+    triggerForceRefresh();
+  }, [selectedGoal, selectedStep, selectedTask, setData, triggerForceRefresh]);
 
   // Edit item title - optimized to reduce unnecessary iterations
   const editItemTitle = useCallback((id, type, newTitle) => {
@@ -381,7 +390,10 @@ function Board({ useCase, onOpenUseCaseSelector }) {
     if (editingNewItem && editingNewItem.id === id) {
       setEditingNewItem(null);
     }
-  }, [setData, editingNewItem]);
+
+    // Force refresh to ensure immediate display
+    triggerForceRefresh();
+  }, [setData, editingNewItem, triggerForceRefresh]);
 
   // Edit column header title
   const editColumnHeader = useCallback((type, newTitle) => {
@@ -492,7 +504,10 @@ function Board({ useCase, onOpenUseCaseSelector }) {
 
       return updateData;
     });
-  }, [setData]);
+
+    // Force refresh to ensure immediate display
+    triggerForceRefresh();
+  }, [setData, triggerForceRefresh]);
 
   // Handle completion toggle - optimized with early exits and cascading completion
   const toggleCompletion = useCallback((itemId, type) => {
@@ -594,7 +609,10 @@ function Board({ useCase, onOpenUseCaseSelector }) {
 
       return updateData;
     });
-  }, [setData]);
+
+    // Force refresh to ensure immediate display
+    triggerForceRefresh();
+  }, [setData, triggerForceRefresh]);
 
   // Delete item - optimized with direct filtering
   const deleteItem = useCallback((itemId, type) => {
@@ -657,7 +675,10 @@ function Board({ useCase, onOpenUseCaseSelector }) {
 
       return updateData;
     });
-  }, [selectedGoal, selectedStep, selectedTask, setData]);
+
+    // Force refresh to ensure immediate display
+    triggerForceRefresh();
+  }, [selectedGoal, selectedStep, selectedTask, setData, triggerForceRefresh]);
 
   // Export data
   const handleExport = useCallback(() => {
@@ -712,13 +733,16 @@ function Board({ useCase, onOpenUseCaseSelector }) {
           setSelectedGoal(null);
           setSelectedStep(null);
           setSelectedTask(null);
+
+          // Force refresh to ensure immediate display
+          triggerForceRefresh();
         } catch (error) {
           alert('Error parsing JSON file');
         }
       };
       reader.readAsText(file);
     }
-  }, [setData, setImportedAppTitle, setImportedAppSubtitle]);
+  }, [setData, setImportedAppTitle, setImportedAppSubtitle, triggerForceRefresh]);
 
   // Reset to empty template
   const handleReset = useCallback(() => {
@@ -736,8 +760,11 @@ function Board({ useCase, onOpenUseCaseSelector }) {
       // Clear any imported app title and subtitle
       setImportedAppTitle(null);
       setImportedAppSubtitle(null);
+
+      // Force refresh to ensure immediate display
+      triggerForceRefresh();
     }
-  }, [setData, setImportedAppTitle, setImportedAppSubtitle]);
+  }, [setData, setImportedAppTitle, setImportedAppSubtitle, triggerForceRefresh]);
 
   // Toggle starred items filter
   const handleToggleStarredFilter = useCallback(() => {
@@ -909,7 +936,10 @@ function Board({ useCase, onOpenUseCaseSelector }) {
 
       return newData;
     });
-  }, [selectedGoal, selectedStep, selectedTask, setData]);
+
+    // Force refresh to ensure immediate display
+    triggerForceRefresh();
+  }, [selectedGoal, selectedStep, selectedTask, setData, triggerForceRefresh]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -960,6 +990,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
               isEditingHeader={editingHeader === 'goals'}
               onEditHeader={(newTitle) => editColumnHeader('goals', newTitle)}
               onStartEditingHeader={() => setEditingHeader('goals')}
+              forceRefresh={forceRefresh}
             />
             
             <Column 
@@ -979,6 +1010,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
               isEditingHeader={editingHeader === 'steps'}
               onEditHeader={(newTitle) => editColumnHeader('steps', newTitle)}
               onStartEditingHeader={() => setEditingHeader('steps')}
+              forceRefresh={forceRefresh}
             />
             
             <Column 
@@ -998,6 +1030,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
               isEditingHeader={editingHeader === 'tasks'}
               onEditHeader={(newTitle) => editColumnHeader('tasks', newTitle)}
               onStartEditingHeader={() => setEditingHeader('tasks')}
+              forceRefresh={forceRefresh}
             />
             
             <Column 
@@ -1016,6 +1049,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
               isEditingHeader={editingHeader === 'initiatives'}
               onEditHeader={(newTitle) => editColumnHeader('initiatives', newTitle)}
               onStartEditingHeader={() => setEditingHeader('initiatives')}
+              forceRefresh={forceRefresh}
             />
           </motion.div>
         </DndContext>

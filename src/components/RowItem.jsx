@@ -32,6 +32,7 @@ const RowItem = memo(function RowItem({
   const containerRef = useRef(null);
   const hoverTimeoutRef = useRef(null);
   const isHoveringRef = useRef(false);
+  const clickTimeoutRef = useRef(null); // For debouncing clicks
 
   // Set up sortable functionality - entire item is draggable with click-hold
   const {
@@ -77,11 +78,14 @@ const RowItem = memo(function RowItem({
     setEditValue(item.title);
   }, [item.title]);
 
-  // Cleanup timeout on unmount
+  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (hoverTimeoutRef.current) {
         clearTimeout(hoverTimeoutRef.current);
+      }
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
       }
     };
   }, []);
@@ -105,18 +109,17 @@ const RowItem = memo(function RowItem({
   const handleDeleteClick = (e) => {
     e.stopPropagation();
     e.preventDefault();
-    
+
     // Ensure we have a delete handler
     if (typeof onDelete !== 'function') {
       console.error('Delete handler not provided');
       return;
     }
-    
+
     const confirmed = window.confirm(`Are you sure you want to delete "${item.title}"?`);
     if (confirmed) {
       // Set deleting state immediately
       setIsDeleting(true);
-      
       // Call the delete handler immediately without delay
       onDelete(item.id);
     }
@@ -157,6 +160,12 @@ const RowItem = memo(function RowItem({
   // Handle click for selection - only if not dragging
   const handleClick = (e) => {
     if (!editMode && onSelect && !isDragging) {
+      // Clear any existing timeout
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+      }
+      
+      // Call onSelect immediately - removed the debounce that was causing the double-click issue
       onSelect();
     }
   };
@@ -174,6 +183,7 @@ const RowItem = memo(function RowItem({
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
     }
+    
     // Use a single timeout to set the state to prevent rapid toggling
     hoverTimeoutRef.current = setTimeout(() => {
       if (isHoveringRef.current) {
@@ -189,6 +199,7 @@ const RowItem = memo(function RowItem({
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
     }
+    
     // Add a small delay before hiding to prevent flicker
     hoverTimeoutRef.current = setTimeout(() => {
       if (!isHoveringRef.current) {
