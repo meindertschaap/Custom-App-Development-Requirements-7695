@@ -5,6 +5,7 @@ import SafeIcon from '../common/SafeIcon';
 import RowItem from './RowItem';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useDroppable } from '@dnd-kit/core';
+import AddItemModal from './AddItemModal';
 
 const { FiChevronRight, FiGrid, FiPlus, FiEdit2 } = FiIcons;
 
@@ -27,7 +28,9 @@ const Column = memo(function Column({
   isEditingHeader = false,
   onEditHeader,
   onStartEditingHeader,
-  forceRefresh = false
+  forceRefresh = false,
+  fields = [],
+  useDonorNameLabel = false
 }) {
   const count = items?.length || 0;
   const completedCount = items?.filter(item => item.completed).length || 0;
@@ -36,6 +39,7 @@ const Column = memo(function Column({
   const [pendingItemSelection, setPendingItemSelection] = useState(null);
   const [headerTitle, setHeaderTitle] = useState(title);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showAddModal, setShowAddModal] = useState(false);
   const headerInputRef = useRef(null);
   const newItemInputRef = useRef(null);
 
@@ -79,8 +83,9 @@ const Column = memo(function Column({
 
   const handleAddItem = () => {
     if (disabled) return;
-    setShowNewItemInput(true);
-    setNewItemTitle("");
+    
+    // Always use modal for adding items
+    setShowAddModal(true);
   };
 
   const handleNewItemSubmit = (e) => {
@@ -108,13 +113,11 @@ const Column = memo(function Column({
     if (newItemTitle.trim()) {
       onAdd(newItemTitle);
       setNewItemTitle("");
-      
       // If there's a pending item selection, process it
       if (pendingItemSelection) {
         onSelect && onSelect(pendingItemSelection);
         setPendingItemSelection(null);
       }
-      
       // Keep the input field open and focused after adding
       requestAnimationFrame(() => {
         if (newItemInputRef.current) {
@@ -123,7 +126,6 @@ const Column = memo(function Column({
       });
     } else {
       setShowNewItemInput(false);
-      
       // If there's a pending item selection, process it
       if (pendingItemSelection) {
         onSelect && onSelect(pendingItemSelection);
@@ -161,6 +163,12 @@ const Column = memo(function Column({
     }
   };
 
+  // Handle adding item from modal
+  const handleAddItemFromModal = (title, data) => {
+    onAdd(title, data);
+    setShowAddModal(false);
+  };
+
   // Create sortable item IDs for dnd-kit
   const itemIds = items ? items.map(item => item.id) : [];
 
@@ -189,9 +197,7 @@ const Column = memo(function Column({
       {/* Column Header - Changed background gradient to be darker */}
       <motion.div
         className={`p-4 border-b border-gray-100 transition-all ${
-          isOver
-            ? 'bg-gradient-to-r from-primary-200 to-primary-300'
-            : 'bg-gradient-to-r from-primary-100 to-primary-200'
+          isOver ? 'bg-gradient-to-r from-primary-200 to-primary-300' : 'bg-gradient-to-r from-primary-100 to-primary-200'
         }`}
         animate={{ backgroundColor: isOver ? '#fed7aa' : '#ffedd5' }}
         transition={{ duration: 0.15 }}
@@ -225,6 +231,7 @@ const Column = memo(function Column({
               </div>
             )}
           </div>
+
           <div className="flex items-center gap-2">
             {!disabled && !showNewItemInput && (
               <motion.button
@@ -261,7 +268,7 @@ const Column = memo(function Column({
                   onSelect={onSelect ? () => handleItemSelect(item) : undefined}
                   onToggleCompletion={() => onToggleCompletion(item.id)}
                   onToggleStarred={() => onToggleStarred(item.id)}
-                  onEdit={(title) => onEdit(item.id, title)}
+                  onEdit={(title, additionalData) => onEdit(item.id, title, additionalData)}
                   onDelete={() => onDelete(item.id)}
                   isSelected={selectedId === item.id}
                   type={type}
@@ -321,6 +328,17 @@ const Column = memo(function Column({
           )}
         </AnimatePresence>
       </div>
+
+      {/* Add Item Modal */}
+      <AddItemModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onAdd={handleAddItemFromModal}
+        title={`Add New ${title.replace(/s$/, '')}`}
+        type={type}
+        fields={fields}
+        useDonorNameLabel={useDonorNameLabel}
+      />
     </motion.div>
   );
 });

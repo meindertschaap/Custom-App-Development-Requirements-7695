@@ -12,66 +12,29 @@ import { format } from 'date-fns';
 
 const { FiGrid, FiStar } = FiIcons;
 
-// Default empty template 
-const emptyTemplate = {
+// Default donor promise template 
+const defaultTemplate = {
   columnHeaders: {
-    goals: "Big Goals",
-    steps: "Milestones",
-    tasks: "Targets",
-    initiatives: "Action Steps"
+    goals: "Donor",
+    steps: "Promises",
+    tasks: "Interventions",
+    initiatives: "Next Actions"
   },
   goals: []
 };
 
-function Board({ useCase, onOpenUseCaseSelector }) {
-  const [data, setData] = useLocalStorage('brainstorm-data', emptyTemplate);
+function Board() {
+  const [data, setData] = useLocalStorage('donor-promise-data', defaultTemplate);
   const [filter, setFilter] = useState('all'); // all, active, completed
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGoal, setSelectedGoal] = useState(null);
   const [selectedStep, setSelectedStep] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [editingNewItem, setEditingNewItem] = useState(null); // Track newly added item being edited
-  const [showNewItemInputs, setShowNewItemInputs] = useState({
-    goal: false,
-    step: false,
-    task: false,
-    initiative: false
-  });
   const [showStarredOnly, setShowStarredOnly] = useState(false);
   const [editingHeader, setEditingHeader] = useState(null); // Track which header is being edited
   const [activeDragData, setActiveDragData] = useState(null);
-  const [lastUseCaseId, setLastUseCaseId] = useLocalStorage('brainstorm-last-use-case-id', null);
-  const [importedAppTitle, setImportedAppTitle] = useLocalStorage('brainstorm-imported-app-title', null);
-  const [importedAppSubtitle, setImportedAppSubtitle] = useLocalStorage('brainstorm-imported-app-subtitle', null);
   const [forceRefresh, setForceRefresh] = useState(0); // Force refresh counter
-
-  // Update column headers based on selected use case
-  // Override custom headers when a NEW template is selected
-  useEffect(() => {
-    if (useCase && useCase.columns) {
-      // If this is a different use case than the last one, override any custom headers
-      const isNewTemplate = useCase.id !== lastUseCaseId;
-      if (isNewTemplate) {
-        setData(prevData => ({
-          ...prevData,
-          columnHeaders: {
-            goals: useCase.columns.goals || "Column 1",
-            steps: useCase.columns.steps || "Column 2",
-            tasks: useCase.columns.tasks || "Column 3",
-            initiatives: useCase.columns.initiatives || "Column 4"
-          },
-          // Reset the user edited flag when applying a new template
-          userEditedHeaders: false
-        }));
-        // Update the last use case ID
-        setLastUseCaseId(useCase.id);
-        
-        // Clear any imported title/subtitle when selecting a new template
-        setImportedAppTitle(null);
-        setImportedAppSubtitle(null);
-      }
-    }
-  }, [useCase, setData, lastUseCaseId, setLastUseCaseId, setImportedAppTitle, setImportedAppSubtitle]);
 
   // Configure DnD sensors with longer delay for click-hold
   const sensors = useSensors(
@@ -205,22 +168,65 @@ function Board({ useCase, onOpenUseCaseSelector }) {
     setForceRefresh(prev => prev + 1);
   }, []);
 
+  // Default values for new items
+  const getDefaultValues = useCallback((type) => {
+    const defaults = {
+      goal: {
+        title: "",
+        amount: "",
+        startDate: format(new Date(), 'yyyy-MM-dd'),
+        endDate: format(new Date(new Date().setFullYear(new Date().getFullYear() + 1)), 'yyyy-MM-dd'),
+      },
+      step: {
+        title: "New Promise",
+        status: "Not started",
+      },
+      task: {
+        title: "New Intervention",
+        team: "",
+      },
+      initiative: {
+        title: "New Next Action",
+        assignee: "",
+        priority: "Medium",
+      }
+    };
+    
+    return defaults[type] || { title: `New ${type}` };
+  }, []);
+
   // Add new items - optimized with useCallback to prevent recreation
-  const addNewItem = useCallback((type, title = null, parentId = null) => {
+  const addNewItem = useCallback((type, title = null, additionalData = {}) => {
     setData(prevData => {
       const updateData = { ...prevData };
       let newItemId = null;
+      const defaultValues = getDefaultValues(type);
 
       switch (type) {
         case 'goal':
+          // Make sure end date is after start date
+          let startDate = additionalData.startDate || defaultValues.startDate;
+          let endDate = additionalData.endDate || defaultValues.endDate;
+          
+          const startDateObj = new Date(startDate);
+          const endDateObj = new Date(endDate);
+          
+          if (endDateObj <= startDateObj) {
+            // If end date is before or equal to start date, set it to one year after
+            endDate = format(new Date(startDateObj.setFullYear(startDateObj.getFullYear() + 1)), 'yyyy-MM-dd');
+          }
+          
           const newGoal = {
             id: uuidv4(),
-            title: title || "New Goal",
+            title: title || defaultValues.title,
             completed: false,
             starred: false,
             priority: (updateData.goals.length || 0) + 1,
             orderIndex: (updateData.goals.length || 0) + 1,
-            steps: []
+            steps: [],
+            amount: additionalData.amount || defaultValues.amount,
+            startDate: startDate,
+            endDate: endDate,
           };
           updateData.goals.push(newGoal);
           setSelectedGoal(newGoal);
@@ -228,8 +234,6 @@ function Board({ useCase, onOpenUseCaseSelector }) {
           setSelectedStep(null);
           setSelectedTask(null);
           newItemId = newGoal.id;
-          // Keep the input field open for the next entry
-          setShowNewItemInputs(prev => ({ ...prev, goal: true }));
           break;
         case 'step':
           if (!selectedGoal) return updateData;
@@ -243,19 +247,18 @@ function Board({ useCase, onOpenUseCaseSelector }) {
           const newStep = {
             id: uuidv4(),
             goalId: selectedGoal.id,
-            title: title || "New Step",
+            title: title || defaultValues.title,
             completed: false,
             starred: false,
             priority: (updateData.goals[goalIndex].steps.length || 0) + 1,
             orderIndex: (updateData.goals[goalIndex].steps.length || 0) + 1,
-            tasks: []
+            tasks: [],
+            status: additionalData.status || defaultValues.status,
           };
           updateData.goals[goalIndex].steps.push(newStep);
           setSelectedStep(newStep);
           setSelectedTask(null);
           newItemId = newStep.id;
-          // Keep the input field open for the next entry
-          setShowNewItemInputs(prev => ({ ...prev, step: true }));
           break;
         case 'task':
           if (!selectedStep || !selectedGoal) return updateData;
@@ -271,18 +274,17 @@ function Board({ useCase, onOpenUseCaseSelector }) {
           const newTask = {
             id: uuidv4(),
             stepId: selectedStep.id,
-            title: title || "New Task",
+            title: title || defaultValues.title,
             completed: false,
             starred: false,
             priority: (updateData.goals[gIndex].steps[sIndex].tasks.length || 0) + 1,
             orderIndex: (updateData.goals[gIndex].steps[sIndex].tasks.length || 0) + 1,
-            initiatives: []
+            initiatives: [],
+            team: additionalData.team || defaultValues.team,
           };
           updateData.goals[gIndex].steps[sIndex].tasks.push(newTask);
           setSelectedTask(newTask);
           newItemId = newTask.id;
-          // Keep the input field open for the next entry
-          setShowNewItemInputs(prev => ({ ...prev, task: true }));
           break;
         case 'initiative':
           if (!selectedTask || !selectedStep || !selectedGoal) return updateData;
@@ -300,16 +302,15 @@ function Board({ useCase, onOpenUseCaseSelector }) {
           const newInitiative = {
             id: uuidv4(),
             taskId: selectedTask.id,
-            title: title || "New Initiative",
+            title: title || defaultValues.title,
             completed: false,
             starred: false,
-            priority: (updateData.goals[goalIdx].steps[stepIdx].tasks[taskIdx].initiatives.length || 0) + 1,
+            priority: additionalData.priority || defaultValues.priority,
+            assignee: additionalData.assignee || defaultValues.assignee,
             orderIndex: (updateData.goals[goalIdx].steps[stepIdx].tasks[taskIdx].initiatives.length || 0) + 1,
           };
           updateData.goals[goalIdx].steps[stepIdx].tasks[taskIdx].initiatives.push(newInitiative);
           newItemId = newInitiative.id;
-          // Keep the input field open for the next entry
-          setShowNewItemInputs(prev => ({ ...prev, initiative: true }));
           break;
       }
 
@@ -326,17 +327,35 @@ function Board({ useCase, onOpenUseCaseSelector }) {
 
     // Force refresh to ensure immediate display
     triggerForceRefresh();
-  }, [selectedGoal, selectedStep, selectedTask, setData, triggerForceRefresh]);
+  }, [selectedGoal, selectedStep, selectedTask, setData, triggerForceRefresh, getDefaultValues]);
 
   // Edit item title - optimized to reduce unnecessary iterations
-  const editItemTitle = useCallback((id, type, newTitle) => {
+  const editItemTitle = useCallback((id, type, newTitle, additionalData = {}) => {
     setData(prevData => {
       const updateData = { ...prevData };
 
       const findAndUpdate = (items, id) => {
         const index = items.findIndex(i => i.id === id);
         if (index !== -1) {
-          items[index].title = newTitle;
+          // For goal type, ensure end date is after start date
+          if (type === 'goal' && additionalData.startDate && additionalData.endDate) {
+            const startDate = new Date(additionalData.startDate);
+            const endDate = new Date(additionalData.endDate);
+            
+            if (endDate <= startDate) {
+              // If end date is before or equal to start date, set it to one year after
+              additionalData.endDate = format(
+                new Date(startDate.setFullYear(startDate.getFullYear() + 1)), 
+                'yyyy-MM-dd'
+              );
+            }
+          }
+          
+          items[index] = {
+            ...items[index],
+            title: newTitle,
+            ...additionalData
+          };
           return true;
         }
         return false;
@@ -400,13 +419,11 @@ function Board({ useCase, onOpenUseCaseSelector }) {
     setData(prevData => {
       const updateData = { ...prevData };
       if (!updateData.columnHeaders) {
-        updateData.columnHeaders = { ...emptyTemplate.columnHeaders };
+        updateData.columnHeaders = { ...defaultTemplate.columnHeaders };
       }
 
       // Update the column header with the new title
       updateData.columnHeaders[type] = newTitle;
-      // Mark that the user has edited headers to prevent template overrides
-      updateData.userEditedHeaders = true;
 
       return updateData;
     });
@@ -683,7 +700,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
   // Export data
   const handleExport = useCallback(() => {
     // Simple filename prompt without embedded page message
-    const customFilename = prompt("Enter a name for your file:", "brainstorm-planner-data");
+    const customFilename = prompt("Enter a name for your file:", "donor-promises-data");
     if (customFilename === null) return; // User cancelled
 
     // Format the current date
@@ -693,14 +710,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
     // Create the full filename with date
     const fullFilename = `${customFilename}-${formattedDate}`;
 
-    // Add app title and subtitle to the data before exporting
-    const exportData = {
-      ...data,
-      appTitle: importedAppTitle || useCase?.title || "Brainstorm Planner",
-      appSubtitle: importedAppSubtitle || useCase?.description || "Break big ideas into clear steps - your way"
-    };
-
-    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataStr = JSON.stringify(data, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
@@ -708,7 +718,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
     link.download = `${fullFilename}.json`;
     link.click();
     URL.revokeObjectURL(url);
-  }, [data, useCase, importedAppTitle, importedAppSubtitle]);
+  }, [data]);
 
   // Import data
   const handleImport = useCallback((event) => {
@@ -718,16 +728,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
       reader.onload = (e) => {
         try {
           const importedData = JSON.parse(e.target.result);
-          
-          // Extract appTitle and appSubtitle from the imported data
-          const { appTitle, appSubtitle, ...dataToStore } = importedData;
-          
-          // Store the imported app title and subtitle
-          if (appTitle) setImportedAppTitle(appTitle);
-          if (appSubtitle) setImportedAppSubtitle(appSubtitle);
-          
-          // Set the data without appTitle and appSubtitle
-          setData(dataToStore);
+          setData(importedData);
           
           // Reset selections
           setSelectedGoal(null);
@@ -742,29 +743,20 @@ function Board({ useCase, onOpenUseCaseSelector }) {
       };
       reader.readAsText(file);
     }
-  }, [setData, setImportedAppTitle, setImportedAppSubtitle, triggerForceRefresh]);
+  }, [setData, triggerForceRefresh]);
 
   // Reset to empty template
   const handleReset = useCallback(() => {
     if (window.confirm('Are you sure you want to reset all data? This cannot be undone.')) {
-      // Keep the column headers but reset the content
-      setData(prevData => ({
-        columnHeaders: prevData.columnHeaders,
-        userEditedHeaders: prevData.userEditedHeaders, // Preserve the userEditedHeaders flag
-        goals: []
-      }));
+      setData(defaultTemplate);
       setSelectedGoal(null);
       setSelectedStep(null);
       setSelectedTask(null);
-      
-      // Clear any imported app title and subtitle
-      setImportedAppTitle(null);
-      setImportedAppSubtitle(null);
 
       // Force refresh to ensure immediate display
       triggerForceRefresh();
     }
-  }, [setData, setImportedAppTitle, setImportedAppSubtitle, triggerForceRefresh]);
+  }, [setData, triggerForceRefresh]);
 
   // Toggle starred items filter
   const handleToggleStarredFilter = useCallback(() => {
@@ -944,8 +936,8 @@ function Board({ useCase, onOpenUseCaseSelector }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <TopBar 
-        title={importedAppTitle || useCase?.title || "Brainstorm Planner"}
-        subtitle={importedAppSubtitle || useCase?.description}
+        title="Donor Promises GET DONE!"
+        subtitle="Track your promises to donors, and then deliver on them"
         filter={filter} 
         setFilter={setFilter}
         searchQuery={searchQuery}
@@ -957,8 +949,6 @@ function Board({ useCase, onOpenUseCaseSelector }) {
         onReset={handleReset}
         onShowStarred={handleToggleStarredFilter}
         showStarredOnly={showStarredOnly}
-        onOpenUseCaseSelector={onOpenUseCaseSelector}
-        useCase={useCase}
       />
       
       <div className="max-w-7xl mx-auto px-4 py-6">
@@ -975,13 +965,13 @@ function Board({ useCase, onOpenUseCaseSelector }) {
             transition={{ duration: 0.2 }}
           >
             <Column 
-              title={data?.columnHeaders?.goals || "Column 1"} 
+              title={data?.columnHeaders?.goals || "Donor"} 
               items={goals} 
               onSelect={handleGoalSelect}
               onToggleCompletion={(id) => toggleCompletion(id, 'goal')}
               onToggleStarred={(id) => toggleStarred(id, 'goal')}
-              onAdd={(title) => addNewItem('goal', title)}
-              onEdit={(id, title) => editItemTitle(id, 'goal', title)}
+              onAdd={(title, additionalData) => addNewItem('goal', title, additionalData)}
+              onEdit={(id, title, additionalData) => editItemTitle(id, 'goal', title, additionalData)}
               onDelete={(id) => deleteItem(id, 'goal')}
               selectedId={selectedGoal?.id}
               type="goal"
@@ -991,16 +981,22 @@ function Board({ useCase, onOpenUseCaseSelector }) {
               onEditHeader={(newTitle) => editColumnHeader('goals', newTitle)}
               onStartEditingHeader={() => setEditingHeader('goals')}
               forceRefresh={forceRefresh}
+              fields={[
+                { name: 'amount', label: 'Total Amount', type: 'text' },
+                { name: 'startDate', label: 'Start Date', type: 'date' },
+                { name: 'endDate', label: 'End Date', type: 'date' }
+              ]}
+              useDonorNameLabel={true}
             />
             
             <Column 
-              title={data?.columnHeaders?.steps || "Column 2"} 
+              title={data?.columnHeaders?.steps || "Promises"} 
               items={steps} 
               onSelect={handleStepSelect}
               onToggleCompletion={(id) => toggleCompletion(id, 'step')}
               onToggleStarred={(id) => toggleStarred(id, 'step')}
-              onAdd={(title) => addNewItem('step', title)}
-              onEdit={(id, title) => editItemTitle(id, 'step', title)}
+              onAdd={(title, additionalData) => addNewItem('step', title, additionalData)}
+              onEdit={(id, title, additionalData) => editItemTitle(id, 'step', title, additionalData)}
               onDelete={(id) => deleteItem(id, 'step')}
               selectedId={selectedStep?.id}
               type="step"
@@ -1011,16 +1007,28 @@ function Board({ useCase, onOpenUseCaseSelector }) {
               onEditHeader={(newTitle) => editColumnHeader('steps', newTitle)}
               onStartEditingHeader={() => setEditingHeader('steps')}
               forceRefresh={forceRefresh}
+              fields={[
+                { 
+                  name: 'status', 
+                  label: 'Status', 
+                  type: 'select', 
+                  options: [
+                    { value: 'Not started', label: 'Not started' },
+                    { value: 'On track', label: 'On track' },
+                    { value: 'At risk', label: 'At risk' }
+                  ] 
+                }
+              ]}
             />
             
             <Column 
-              title={data?.columnHeaders?.tasks || "Column 3"} 
+              title={data?.columnHeaders?.tasks || "Interventions"} 
               items={tasks} 
               onSelect={handleTaskSelect}
               onToggleCompletion={(id) => toggleCompletion(id, 'task')}
               onToggleStarred={(id) => toggleStarred(id, 'task')}
-              onAdd={(title) => addNewItem('task', title)}
-              onEdit={(id, title) => editItemTitle(id, 'task', title)}
+              onAdd={(title, additionalData) => addNewItem('task', title, additionalData)}
+              onEdit={(id, title, additionalData) => editItemTitle(id, 'task', title, additionalData)}
               onDelete={(id) => deleteItem(id, 'task')}
               selectedId={selectedTask?.id}
               type="task"
@@ -1031,15 +1039,18 @@ function Board({ useCase, onOpenUseCaseSelector }) {
               onEditHeader={(newTitle) => editColumnHeader('tasks', newTitle)}
               onStartEditingHeader={() => setEditingHeader('tasks')}
               forceRefresh={forceRefresh}
+              fields={[
+                { name: 'team', label: 'Responsible Team(s)', type: 'text' }
+              ]}
             />
             
             <Column 
-              title={data?.columnHeaders?.initiatives || "Column 4"} 
+              title={data?.columnHeaders?.initiatives || "Next Actions"} 
               items={initiatives} 
               onToggleCompletion={(id) => toggleCompletion(id, 'initiative')}
               onToggleStarred={(id) => toggleStarred(id, 'initiative')}
-              onAdd={(title) => addNewItem('initiative', title)}
-              onEdit={(id, title) => editItemTitle(id, 'initiative', title)}
+              onAdd={(title, additionalData) => addNewItem('initiative', title, additionalData)}
+              onEdit={(id, title, additionalData) => editItemTitle(id, 'initiative', title, additionalData)}
               onDelete={(id) => deleteItem(id, 'initiative')}
               type="initiative"
               disabled={!selectedTask}
@@ -1050,6 +1061,19 @@ function Board({ useCase, onOpenUseCaseSelector }) {
               onEditHeader={(newTitle) => editColumnHeader('initiatives', newTitle)}
               onStartEditingHeader={() => setEditingHeader('initiatives')}
               forceRefresh={forceRefresh}
+              fields={[
+                { name: 'assignee', label: 'Assignee', type: 'text' },
+                { 
+                  name: 'priority', 
+                  label: 'Priority', 
+                  type: 'select', 
+                  options: [
+                    { value: 'Low', label: 'Low' },
+                    { value: 'Medium', label: 'Medium' },
+                    { value: 'High', label: 'High' }
+                  ] 
+                }
+              ]}
             />
           </motion.div>
         </DndContext>
@@ -1062,7 +1086,7 @@ function Board({ useCase, onOpenUseCaseSelector }) {
             alt="WWSC Logo" 
             className="h-6 w-auto"
           />
-          <p>Brainstorm Planner App © {new Date().getFullYear()} - StreetRise International</p>
+          <p>Donor Promises App © {new Date().getFullYear()} - StreetRise International</p>
         </div>
       </div>
     </div>
