@@ -1,12 +1,12 @@
-import React, { useState, useRef, useEffect, memo } from 'react';
-import { motion } from 'framer-motion';
+import React, {useState, useRef, useEffect, memo} from 'react';
+import {motion} from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { differenceInDays, format } from 'date-fns';
+import {useSortable} from '@dnd-kit/sortable';
+import {CSS} from '@dnd-kit/utilities';
+import {differenceInDays, format} from 'date-fns';
 
-const { FiCheck, FiChevronRight, FiEdit2, FiTrash2, FiAlertCircle, FiAlertTriangle, FiChevronsRight, FiAlert } = FiIcons;
+const {FiCheck, FiChevronRight, FiEdit2, FiTrash2, FiAlertCircle, FiAlertTriangle, FiChevronsRight, FiAlert} = FiIcons;
 
 // Memoized RowItem component to prevent unnecessary re-renders
 const RowItem = memo(function RowItem({
@@ -96,17 +96,19 @@ const RowItem = memo(function RowItem({
 
   const handleEditClick = (e) => {
     e.stopPropagation();
-    onEdit(); // Call the edit function passed from Column
+    onEdit();  // Call the edit function passed from Column
   };
 
   const handleDeleteClick = (e) => {
     e.stopPropagation();
     e.preventDefault();
+    
     // Ensure we have a delete handler
     if (typeof onDelete !== 'function') {
       console.error('Delete handler not provided');
       return;
     }
+    
     const confirmed = window.confirm(`Are you sure you want to delete "${item.title}"?`);
     if (confirmed) {
       // Set deleting state immediately
@@ -123,6 +125,7 @@ const RowItem = memo(function RowItem({
   const handleInputKeyDown = (e) => {
     // Allow all keys including space
     e.stopPropagation();
+    
     if (e.key === 'Enter') {
       if (editValue.trim()) {
         // Call onEdit directly with the new value
@@ -148,14 +151,20 @@ const RowItem = memo(function RowItem({
     setEditMode(false);
   };
 
-  // Handle click for selection - only if not dragging
+  // Handle click for selection - only if not dragging 
   const handleClick = (e) => {
+    // FIXED: Stop propagation for completed items to prevent bubbling
+    if (item.completed) {
+      e.stopPropagation();
+    }
+    
     if (!editMode && onSelect && !isDragging) {
       // Clear any existing timeout
       if (clickTimeoutRef.current) {
         clearTimeout(clickTimeoutRef.current);
       }
-      // Call onSelect immediately - removed the debounce that was causing the double-click issue
+      
+      // Call onSelect immediately
       onSelect();
     }
   };
@@ -168,11 +177,13 @@ const RowItem = memo(function RowItem({
   // Completely eliminate flickering with a more robust hover system
   const handleMouseEnter = () => {
     isHoveringRef.current = true;
+    
     // Clear any existing timeout
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
     }
+    
     // Use a single timeout to set the state to prevent rapid toggling
     hoverTimeoutRef.current = setTimeout(() => {
       if (isHoveringRef.current) {
@@ -183,11 +194,13 @@ const RowItem = memo(function RowItem({
 
   const handleMouseLeave = () => {
     isHoveringRef.current = false;
+    
     // Clear any pending timeout
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
     }
+    
     // Add a small delay before hiding to prevent flicker
     hoverTimeoutRef.current = setTimeout(() => {
       if (!isHoveringRef.current) {
@@ -207,9 +220,17 @@ const RowItem = memo(function RowItem({
         if (item.completed) {
           return null; // No flag if completed
         } else if (daysRemaining <= 30) {
-          return { icon: FiAlertCircle, color: 'text-red-500', tooltip: 'Less than 30 days remaining' };
+          return {
+            icon: FiAlertCircle,
+            color: 'text-red-500',
+            tooltip: 'Less than 30 days remaining'
+          };
         } else if (daysRemaining <= 60) {
-          return { icon: FiAlertTriangle, color: 'text-amber-500', tooltip: '31-60 days remaining' };
+          return {
+            icon: FiAlertTriangle,
+            color: 'text-amber-500',
+            tooltip: '31-60 days remaining'
+          };
         }
       } catch (e) {
         console.error("Error calculating RAG status:", e);
@@ -220,7 +241,7 @@ const RowItem = memo(function RowItem({
 
   // Get RAG status
   const ragStatus = getRagStatus();
-  
+
   // Get progress percentage for donor timeline
   const getTimelineProgress = () => {
     if (type === 'goal' && item.startDate && item.endDate) {
@@ -244,7 +265,7 @@ const RowItem = memo(function RowItem({
           color = 'bg-red-500'; // Red for >85%
         }
         
-        return { percentage, color };
+        return {percentage, color};
       } catch (e) {
         console.error("Error calculating timeline progress:", e);
       }
@@ -264,22 +285,22 @@ const RowItem = memo(function RowItem({
         const daysUntilReport = differenceInDays(reportDate, today);
         
         if (daysUntilReport < 0) {
-          return { 
-            status: 'overdue', 
-            background: 'bg-red-600 text-white', 
+          return {
+            status: 'overdue',
+            background: 'bg-red-600 text-white',
             icon: FiAlert,
             tooltip: 'Report deadline has passed'
           };
         } else if (daysUntilReport < 30) {
-          return { 
-            status: 'urgent', 
-            background: 'bg-red-500 text-white', 
+          return {
+            status: 'urgent',
+            background: 'bg-red-500 text-white',
             tooltip: 'Less than 30 days until report'
           };
         } else if (daysUntilReport < 60) {
-          return { 
-            status: 'warning', 
-            background: 'bg-orange-500 text-white', 
+          return {
+            status: 'warning',
+            background: 'bg-orange-500 text-white',
             tooltip: 'Less than 60 days until report'
           };
         }
@@ -308,28 +329,20 @@ const RowItem = memo(function RowItem({
   // Get status color for promises (updated colors)
   const getStatusColor = (status) => {
     switch (status) {
-      case 'On track':
-        return 'bg-green-100 text-green-700';
-      case 'Not started':
-        return 'bg-blue-50 text-blue-600'; // Lighter blue
-      case 'At risk':
-        return 'bg-red-200 text-red-800'; // Stronger red
-      default:
-        return 'bg-gray-100 text-gray-700';
+      case 'On track': return 'bg-green-100 text-green-700';
+      case 'Not started': return 'bg-blue-50 text-blue-600'; // Lighter blue
+      case 'At risk': return 'bg-red-200 text-red-800'; // Stronger red
+      default: return 'bg-gray-100 text-gray-700';
     }
   };
 
   // Get progress color for initiatives (tasks)
   const getProgressColor = (progress) => {
     switch (progress) {
-      case 'Going well':
-        return 'bg-green-100 text-green-700';
-      case 'Going OK-ish':
-        return 'bg-yellow-100 text-yellow-700';
-      case 'Struggling':
-        return 'bg-red-100 text-red-700';
-      default:
-        return 'bg-gray-100 text-gray-700';
+      case 'Going well': return 'bg-green-100 text-green-700';
+      case 'Going OK-ish': return 'bg-yellow-100 text-yellow-700';
+      case 'Struggling': return 'bg-red-100 text-red-700';
+      default: return 'bg-gray-100 text-gray-700';
     }
   };
 
@@ -355,13 +368,13 @@ const RowItem = memo(function RowItem({
       onClick={handleClick}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      initial={{ opacity: 0, y: 5 }}
+      initial={{opacity: 0, y: 5}}
       animate={{
         opacity: isDragging ? 0.8 : 1,
         y: 0,
         scale: isDragging ? 1.05 : 1,
         rotate: isDragging ? 2 : 0,
-        boxShadow: isDragging ? '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(249,115,22,0.4)' : '0 1px 3px 0 rgba(0,0,0,0.1)'
+        boxShadow: isDragging ? '0 25px 50px -12px rgba(0,0,0,0.25),0 0 0 1px rgba(249,115,22,0.4)' : '0 1px 3px 0 rgba(0,0,0,0.1)'
       }}
       transition={{
         duration: isDragging ? 0.2 : 0.15,
@@ -370,8 +383,8 @@ const RowItem = memo(function RowItem({
         stiffness: isDragging ? 300 : 200,
         layoutId: undefined // Remove layout animation that causes scrolling
       }}
-      whileHover={!isDragging ? { x: 2 } : {}}
-      exit={{ opacity: 0, height: 0, marginBottom: 0, padding: 0 }}
+      whileHover={!isDragging ? {x: 2} : {}}
+      exit={{opacity: 0, height: 0, marginBottom: 0, padding: 0}}
     >
       <div className="flex items-start gap-3 row-item-content relative">
         {/* Checkbox */}
@@ -380,8 +393,8 @@ const RowItem = memo(function RowItem({
           className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
             item.completed ? 'bg-success-500 border-success-500 text-white' : 'border-gray-300 hover:border-success-400'
           }`}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
+          whileHover={{scale: 1.1}}
+          whileTap={{scale: 0.9}}
         >
           {item.completed && <SafeIcon icon={FiCheck} className="text-xs" />}
         </motion.button>
@@ -399,7 +412,7 @@ const RowItem = memo(function RowItem({
               onClick={handleInputClick}
               className="w-full px-2 py-1 border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 text-base pointer-events-auto"
               autoFocus
-              style={{ pointerEvents: 'auto' }}
+              style={{pointerEvents: 'auto'}}
             />
           ) : (
             <>
@@ -421,7 +434,7 @@ const RowItem = memo(function RowItem({
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Show metadata based on type */}
                   {type === 'goal' && (
                     <div className="flex flex-col mt-1 text-xs text-gray-500">
@@ -435,9 +448,9 @@ const RowItem = memo(function RowItem({
                           </span>
                           {timelineProgress && (
                             <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
-                              <div 
-                                className={`h-1.5 rounded-full ${timelineProgress.color}`} 
-                                style={{ width: `${timelineProgress.percentage}%` }}
+                              <div
+                                className={`h-1.5 rounded-full ${timelineProgress.color}`}
+                                style={{width: `${timelineProgress.percentage}%`}}
                               ></div>
                             </div>
                           )}
@@ -450,11 +463,7 @@ const RowItem = memo(function RowItem({
                             nextReportStatus ? nextReportStatus.background : 'bg-gray-100 text-gray-700'
                           }`}>
                             {nextReportStatus?.icon && (
-                              <SafeIcon 
-                                icon={nextReportStatus.icon} 
-                                className="text-xs" 
-                                title={nextReportStatus.tooltip}
-                              />
+                              <SafeIcon icon={nextReportStatus.icon} className="text-xs" title={nextReportStatus.tooltip} />
                             )}
                             {formatDate(item.nextReportDate)}
                           </div>
@@ -462,7 +471,7 @@ const RowItem = memo(function RowItem({
                       )}
                     </div>
                   )}
-                  
+
                   {type === 'step' && item.status && (
                     <div className="mt-1">
                       <span className={`text-xs px-2 py-0.5 rounded ${getStatusColor(item.status)}`}>
@@ -470,7 +479,7 @@ const RowItem = memo(function RowItem({
                       </span>
                     </div>
                   )}
-                  
+
                   {type === 'task' && item.progress && (
                     <div className="mt-1">
                       <span className={`text-xs px-2 py-0.5 rounded ${getProgressColor(item.progress)}`}>
@@ -478,7 +487,7 @@ const RowItem = memo(function RowItem({
                       </span>
                     </div>
                   )}
-                  
+
                   {type === 'initiative' && (
                     <div className="flex flex-col mt-1 text-xs text-gray-500">
                       {item.assignee && (
@@ -487,7 +496,7 @@ const RowItem = memo(function RowItem({
                       {item.priority && (
                         <span className={`mt-1 inline-block px-2 py-0.5 rounded ${
                           item.priority === 'High' ? 'bg-red-100 text-red-700' :
-                          item.priority === 'Medium' ? 'bg-amber-100 text-amber-700' : 
+                          item.priority === 'Medium' ? 'bg-amber-100 text-amber-700' :
                           'bg-blue-100 text-blue-700'
                         }`}>
                           {item.priority}
@@ -496,13 +505,13 @@ const RowItem = memo(function RowItem({
                     </div>
                   )}
                 </div>
-                
+
                 {/* Improved visual indicator for navigation */}
-                {!isLeaf && onSelect && (
+                {(!isLeaf && onSelect) || (item.completed && onSelect) ? (
                   <div className="flex-shrink-0 p-1.5">
-                    <div className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all 
-                      ${isSelected ? 'border-primary-500 bg-primary-500 bg-opacity-80 text-white' : 'border-gray-300 text-gray-400'}`}
-                    >
+                    <div className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${
+                      isSelected ? 'border-primary-500 bg-primary-500 bg-opacity-80 text-white' : 'border-gray-300 text-gray-400'
+                    }`}>
                       <SafeIcon
                         icon={isSelected ? FiChevronsRight : FiChevronRight}
                         className="transition-transform"
@@ -510,34 +519,33 @@ const RowItem = memo(function RowItem({
                       />
                     </div>
                   </div>
-                )}
+                ) : null}
               </div>
 
               {/* Overlay Action Buttons - positioned absolutely */}
               {!editMode && showActions && (
                 <motion.div
                   className="absolute top-0 right-0 flex items-center gap-1 bg-white/95 backdrop-blur-sm rounded-lg px-2 py-1 shadow-lg border border-gray-200 z-10"
-                  initial={{ opacity: 0, scale: 0.9, x: 10 }}
-                  animate={{ opacity: 1, scale: 1, x: 0 }}
-                  exit={{ opacity: 0, scale: 0.9, x: 10 }}
-                  transition={{ duration: 0.15 }}
-                  style={{ marginRight: !isLeaf && onSelect ? '44px' : '0px' }} // Increased offset for new button size
+                  initial={{opacity: 0, scale: 0.9, x: 10}}
+                  animate={{opacity: 1, scale: 1, x: 0}}
+                  exit={{opacity: 0, scale: 0.9, x: 10}}
+                  transition={{duration: 0.15}}
+                  style={{marginRight: (!isLeaf && onSelect) || (item.completed && onSelect) ? '44px' : '0px'}} // Increased offset for new button size
                 >
                   <motion.button
                     onClick={handleEditClick}
                     className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-all"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
+                    whileHover={{scale: 1.1}}
+                    whileTap={{scale: 0.9}}
                     title="Edit"
                   >
                     <SafeIcon icon={FiEdit2} className="text-sm" />
                   </motion.button>
-
                   <motion.button
                     onClick={handleDeleteClick}
                     className="p-1.5 text-gray-400 hover:text-danger-600 hover:bg-danger-50 rounded transition-all"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
+                    whileHover={{scale: 1.1}}
+                    whileTap={{scale: 0.9}}
                     title="Delete"
                   >
                     <SafeIcon icon={FiTrash2} className="text-sm" />
