@@ -15,7 +15,6 @@ const Column = memo(function Column({
   items,
   onSelect,
   onToggleCompletion,
-  onToggleStarred,
   onAdd,
   onEdit,
   onDelete,
@@ -24,7 +23,6 @@ const Column = memo(function Column({
   disabled = false,
   isLeaf = false,
   editingNewItemId = null,
-  parentStarred = true,
   isEditingHeader = false,
   onEditHeader,
   onStartEditingHeader,
@@ -40,6 +38,8 @@ const Column = memo(function Column({
   const [headerTitle, setHeaderTitle] = useState(title);
   const [refreshKey, setRefreshKey] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
   const headerInputRef = useRef(null);
   const newItemInputRef = useRef(null);
 
@@ -86,6 +86,11 @@ const Column = memo(function Column({
     
     // Always use modal for adding items
     setShowAddModal(true);
+  };
+
+  const handleEditItem = (item) => {
+    setEditingItem(item);
+    setShowEditModal(true);
   };
 
   const handleNewItemSubmit = (e) => {
@@ -167,6 +172,15 @@ const Column = memo(function Column({
   const handleAddItemFromModal = (title, data) => {
     onAdd(title, data);
     setShowAddModal(false);
+  };
+
+  // Handle editing item from modal
+  const handleEditItemFromModal = (title, data) => {
+    if (editingItem) {
+      onEdit(editingItem.id, title, data);
+      setShowEditModal(false);
+      setEditingItem(null);
+    }
   };
 
   // Create sortable item IDs for dnd-kit
@@ -267,8 +281,7 @@ const Column = memo(function Column({
                   item={item}
                   onSelect={onSelect ? () => handleItemSelect(item) : undefined}
                   onToggleCompletion={() => onToggleCompletion(item.id)}
-                  onToggleStarred={() => onToggleStarred(item.id)}
-                  onEdit={(title, additionalData) => onEdit(item.id, title, additionalData)}
+                  onEdit={() => handleEditItem(item)}
                   onDelete={() => onDelete(item.id)}
                   isSelected={selectedId === item.id}
                   type={type}
@@ -278,7 +291,6 @@ const Column = memo(function Column({
                   onEditComplete={() => {
                     // Don't auto open input when completing an edit
                   }}
-                  canBeStar={parentStarred}
                 />
               ))}
 
@@ -338,6 +350,23 @@ const Column = memo(function Column({
         type={type}
         fields={fields}
         useDonorNameLabel={useDonorNameLabel}
+        isEditMode={false}
+      />
+
+      {/* Edit Item Modal */}
+      <AddItemModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingItem(null);
+        }}
+        onEdit={handleEditItemFromModal}
+        title={`Edit ${title.replace(/s$/, '')}`}
+        type={type}
+        fields={fields}
+        useDonorNameLabel={useDonorNameLabel}
+        isEditMode={true}
+        editingItem={editingItem}
       />
     </motion.div>
   );

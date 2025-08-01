@@ -6,14 +6,13 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { differenceInDays, format } from 'date-fns';
 
-const { FiCheck, FiChevronRight, FiEdit2, FiTrash2, FiStar, FiAlertCircle, FiAlertTriangle } = FiIcons;
+const { FiCheck, FiChevronRight, FiEdit2, FiTrash2, FiAlertCircle, FiAlertTriangle, FiChevronsRight, FiAlert } = FiIcons;
 
 // Memoized RowItem component to prevent unnecessary re-renders
 const RowItem = memo(function RowItem({
   item,
   onSelect,
   onToggleCompletion,
-  onToggleStarred,
   onEdit,
   onDelete,
   isSelected,
@@ -21,8 +20,7 @@ const RowItem = memo(function RowItem({
   isLeaf = false,
   index,
   isEditing = false,
-  onEditComplete,
-  canBeStar = true
+  onEditComplete
 }) {
   const [editMode, setEditMode] = useState(isEditing);
   const [editValue, setEditValue] = useState(item.title);
@@ -96,15 +94,9 @@ const RowItem = memo(function RowItem({
     onToggleCompletion();
   };
 
-  const handleStarClick = (e) => {
-    e.stopPropagation();
-    onToggleStarred();
-  };
-
   const handleEditClick = (e) => {
     e.stopPropagation();
-    setEditValue(item.title);
-    setEditMode(true);
+    onEdit(); // Call the edit function passed from Column
   };
 
   const handleDeleteClick = (e) => {
@@ -164,14 +156,6 @@ const RowItem = memo(function RowItem({
         clearTimeout(clickTimeoutRef.current);
       }
       // Call onSelect immediately - removed the debounce that was causing the double-click issue
-      onSelect();
-    }
-  };
-
-  // Handle chevron click separately to prevent overlap with action buttons
-  const handleChevronClick = (e) => {
-    e.stopPropagation();
-    if (!editMode && onSelect && !isDragging) {
       onSelect();
     }
   };
@@ -253,9 +237,11 @@ const RowItem = memo(function RowItem({
         const percentage = Math.max(0, Math.min(100, (elapsedTime / totalDuration) * 100));
         
         // Determine color based on percentage
-        let color = 'bg-primary-500'; // Default blue
-        if (percentage > 80) {
-          color = percentage > 90 ? 'bg-red-500' : 'bg-amber-500';
+        let color = 'bg-green-500'; // Light/mid-green for 0-70%
+        if (percentage > 70 && percentage <= 85) {
+          color = 'bg-orange-500'; // Orange for >70-85%
+        } else if (percentage > 85) {
+          color = 'bg-red-500'; // Red for >85%
         }
         
         return { percentage, color };
@@ -269,6 +255,44 @@ const RowItem = memo(function RowItem({
   // Get timeline progress
   const timelineProgress = getTimelineProgress();
 
+  // Get next report date status for goals
+  const getNextReportStatus = () => {
+    if (type === 'goal' && item.nextReportDate) {
+      try {
+        const reportDate = new Date(item.nextReportDate);
+        const today = new Date();
+        const daysUntilReport = differenceInDays(reportDate, today);
+        
+        if (daysUntilReport < 0) {
+          return { 
+            status: 'overdue', 
+            background: 'bg-red-600 text-white', 
+            icon: FiAlert,
+            tooltip: 'Report deadline has passed'
+          };
+        } else if (daysUntilReport < 30) {
+          return { 
+            status: 'urgent', 
+            background: 'bg-red-500 text-white', 
+            tooltip: 'Less than 30 days until report'
+          };
+        } else if (daysUntilReport < 60) {
+          return { 
+            status: 'warning', 
+            background: 'bg-orange-500 text-white', 
+            tooltip: 'Less than 60 days until report'
+          };
+        }
+      } catch (e) {
+        console.error("Error calculating next report status:", e);
+      }
+    }
+    return null;
+  };
+
+  // Get next report status
+  const nextReportStatus = getNextReportStatus();
+
   // Optimized to reduce animation load for large lists
   const staggerDelay = Math.min(0.05, 0.02 + (index * 0.001));
 
@@ -278,6 +302,34 @@ const RowItem = memo(function RowItem({
       return format(new Date(dateString), 'dd-MMM-yyyy');
     } catch (e) {
       return dateString;
+    }
+  };
+
+  // Get status color for promises (updated colors)
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'On track':
+        return 'bg-green-100 text-green-700';
+      case 'Not started':
+        return 'bg-blue-50 text-blue-600'; // Lighter blue
+      case 'At risk':
+        return 'bg-red-200 text-red-800'; // Stronger red
+      default:
+        return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  // Get progress color for initiatives (tasks)
+  const getProgressColor = (progress) => {
+    switch (progress) {
+      case 'Going well':
+        return 'bg-green-100 text-green-700';
+      case 'Going OK-ish':
+        return 'bg-yellow-100 text-yellow-700';
+      case 'Struggling':
+        return 'bg-red-100 text-red-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
     }
   };
 
@@ -355,9 +407,6 @@ const RowItem = memo(function RowItem({
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1">
                   <div className="flex items-center gap-1">
-                    {item.starred && (
-                      <SafeIcon icon={FiStar} className="text-amber-500 flex-shrink-0" />
-                    )}
                     <h4
                       ref={titleRef}
                       className={`text-base leading-tight ${
@@ -394,24 +443,39 @@ const RowItem = memo(function RowItem({
                           )}
                         </div>
                       )}
+                      {item.nextReportDate && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="text-xs text-gray-500">Next Report:</span>
+                          <div className={`text-xs px-2 py-0.5 rounded flex items-center gap-1 ${
+                            nextReportStatus ? nextReportStatus.background : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {nextReportStatus?.icon && (
+                              <SafeIcon 
+                                icon={nextReportStatus.icon} 
+                                className="text-xs" 
+                                title={nextReportStatus.tooltip}
+                              />
+                            )}
+                            {formatDate(item.nextReportDate)}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                   
                   {type === 'step' && item.status && (
                     <div className="mt-1">
-                      <span className={`text-xs px-2 py-0.5 rounded ${
-                        item.status === 'At risk' ? 'bg-red-100 text-red-700' :
-                        item.status === 'On track' ? 'bg-green-100 text-green-700' : 
-                        'bg-gray-100 text-gray-700'
-                      }`}>
+                      <span className={`text-xs px-2 py-0.5 rounded ${getStatusColor(item.status)}`}>
                         {item.status}
                       </span>
                     </div>
                   )}
                   
-                  {type === 'task' && item.team && (
-                    <div className="mt-1 text-xs text-gray-500">
-                      Team(s): {item.team}
+                  {type === 'task' && item.progress && (
+                    <div className="mt-1">
+                      <span className={`text-xs px-2 py-0.5 rounded ${getProgressColor(item.progress)}`}>
+                        {item.progress}
+                      </span>
                     </div>
                   )}
                   
@@ -435,21 +499,17 @@ const RowItem = memo(function RowItem({
                 
                 {/* Improved visual indicator for navigation */}
                 {!isLeaf && onSelect && (
-                  <button 
-                    onClick={handleChevronClick}
-                    className="flex-shrink-0 p-1.5 hover:bg-primary-100 rounded-full transition-colors"
-                    title={isSelected ? "Hide details" : "Show details"}
-                  >
+                  <div className="flex-shrink-0 p-1.5">
                     <div className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all 
-                      ${isSelected ? 'border-primary-500 bg-primary-500 text-white' : 'border-gray-300 text-gray-400 hover:border-primary-300'}`}
+                      ${isSelected ? 'border-primary-500 bg-primary-500 bg-opacity-80 text-white' : 'border-gray-300 text-gray-400'}`}
                     >
                       <SafeIcon
-                        icon={FiChevronRight}
-                        className={`transition-transform ${isSelected ? 'rotate-90' : ''}`}
+                        icon={isSelected ? FiChevronsRight : FiChevronRight}
+                        className="transition-transform"
                         size={16}
                       />
                     </div>
-                  </button>
+                  </div>
                 )}
               </div>
 
@@ -463,20 +523,6 @@ const RowItem = memo(function RowItem({
                   transition={{ duration: 0.15 }}
                   style={{ marginRight: !isLeaf && onSelect ? '44px' : '0px' }} // Increased offset for new button size
                 >
-                  {canBeStar && (
-                    <motion.button
-                      onClick={handleStarClick}
-                      className={`p-1.5 ${
-                        item.starred ? 'text-amber-500' : 'text-gray-400 hover:text-amber-500'
-                      } hover:bg-amber-50 rounded transition-all`}
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      title={item.starred ? "Unstar" : "Star"}
-                    >
-                      <SafeIcon icon={FiStar} className="text-sm" />
-                    </motion.button>
-                  )}
-
                   <motion.button
                     onClick={handleEditClick}
                     className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-all"

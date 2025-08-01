@@ -6,19 +6,40 @@ import { format } from 'date-fns';
 
 const { FiX } = FiIcons;
 
-function AddItemModal({ isOpen, onClose, onAdd, title, type, fields = [], useDonorNameLabel = false }) {
+function AddItemModal({ 
+  isOpen, 
+  onClose, 
+  onAdd, 
+  onEdit,
+  title, 
+  type, 
+  fields = [], 
+  useDonorNameLabel = false,
+  editingItem = null,
+  isEditMode = false
+}) {
   const [formData, setFormData] = useState({ title: '' });
 
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
-      const initialData = { title: '' };
-      fields.forEach(field => {
-        initialData[field.name] = field.defaultValue || '';
-      });
-      setFormData(initialData);
+      if (isEditMode && editingItem) {
+        // Pre-populate form with existing item data
+        const initialData = { title: editingItem.title };
+        fields.forEach(field => {
+          initialData[field.name] = editingItem[field.name] || field.defaultValue || '';
+        });
+        setFormData(initialData);
+      } else {
+        // New item - use defaults
+        const initialData = { title: '' };
+        fields.forEach(field => {
+          initialData[field.name] = field.defaultValue || '';
+        });
+        setFormData(initialData);
+      }
     }
-  }, [isOpen, fields]);
+  }, [isOpen, fields, isEditMode, editingItem]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -47,8 +68,12 @@ function AddItemModal({ isOpen, onClose, onAdd, title, type, fields = [], useDon
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (formData.title.trim()) {
-      onAdd(formData.title, formData);
+    if (canSubmit()) {
+      if (isEditMode) {
+        onEdit(formData.title, formData);
+      } else {
+        onAdd(formData.title, formData);
+      }
     }
   };
 
@@ -63,6 +88,22 @@ function AddItemModal({ isOpen, onClose, onAdd, title, type, fields = [], useDon
     }
   };
 
+  // Check if all required fields are filled
+  const canSubmit = () => {
+    // Title is always required
+    if (!formData.title?.trim()) return false;
+    
+    // Check all fields are filled for non-edit mode or edit mode
+    for (const field of fields) {
+      const value = formData[field.name];
+      if (!value || (typeof value === 'string' && !value.trim())) {
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
   // Define what fields to show based on the item type
   let displayFields = [];
   
@@ -74,6 +115,26 @@ function AddItemModal({ isOpen, onClose, onAdd, title, type, fields = [], useDon
   } else {
     displayFields = fields;
   }
+
+  // Get minimum date for end date picker (should be after start date)
+  const getMinEndDate = () => {
+    if (type === 'goal' && formData.startDate) {
+      const startDate = new Date(formData.startDate);
+      startDate.setDate(startDate.getDate() + 1); // Add one day to start date
+      return format(startDate, 'yyyy-MM-dd');
+    }
+    return '';
+  };
+
+  // Check if field should be in two-column layout (for goal start/end dates)
+  const isDateField = (field) => {
+    return type === 'goal' && (field.name === 'startDate' || field.name === 'endDate');
+  };
+
+  // Group fields for goal type - dates after title, then other fields
+  const titleField = { name: 'title', label: useDonorNameLabel ? "Grant/Donor Name, Duration, Country" : "Title", type: 'text' };
+  const dateFields = displayFields.filter(field => isDateField(field));
+  const nonDateFields = displayFields.filter(field => !isDateField(field));
 
   if (!isOpen) return null;
 
@@ -99,7 +160,9 @@ function AddItemModal({ isOpen, onClose, onAdd, title, type, fields = [], useDon
         >
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+            <h3 className="text-lg font-semibold text-gray-900">
+              {isEditMode ? `Edit ${title.replace(/^(Add New |Edit )/, '')}` : title}
+            </h3>
             <motion.button
               onClick={onClose}
               className="p-1 rounded-full hover:bg-gray-100 text-gray-500"
@@ -112,29 +175,48 @@ function AddItemModal({ isOpen, onClose, onAdd, title, type, fields = [], useDon
           
           {/* Form */}
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            {/* Essential fields (always shown) */}
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="block text-sm font-medium text-gray-700">
-                  {useDonorNameLabel ? "Grant/Donor Name, Duration, Country" : "Title"} <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="title"
-                  value={formData.title || ''}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  placeholder={useDonorNameLabel ? "E.g., UNICEF Youth Project 2023-2025, Tanzania" : `Enter title`}
-                  autoFocus
-                />
-              </div>
+            {/* Title field (always first) */}
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700">
+                {titleField.label}
+              </label>
+              <input
+                type="text"
+                name="title"
+                value={formData.title || ''}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder={useDonorNameLabel ? "E.g., UNICEF Youth Project 2023-2025, Tanzania" : `Enter title`}
+                autoFocus
+              />
             </div>
+
+            {/* Date fields in two-column layout for goals (positioned after title) */}
+            {type === 'goal' && dateFields.length > 0 && (
+              <div className="grid grid-cols-2 gap-4">
+                {dateFields.map(field => (
+                  <div key={field.name} className="space-y-1">
+                    <label className="block text-sm font-medium text-gray-700">
+                      {field.label}
+                    </label>
+                    <input
+                      type="date"
+                      name={field.name}
+                      value={formatDateForInput(formData[field.name] || '')}
+                      onChange={handleChange}
+                      min={field.name === 'endDate' ? getMinEndDate() : undefined}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
             
-            {/* Advanced fields (always shown) */}
-            {displayFields.length > 0 && (
-              <div className="space-y-4 border-t border-gray-200 pt-4 mt-4">
-                {displayFields.map(field => (
+            {/* Other fields */}
+            {nonDateFields.length > 0 && (
+              <div className="space-y-4">
+                {nonDateFields.map(field => (
                   <div key={field.name} className="space-y-1">
                     <label className="block text-sm font-medium text-gray-700">
                       {field.label}
@@ -157,6 +239,7 @@ function AddItemModal({ isOpen, onClose, onAdd, title, type, fields = [], useDon
                         name={field.name}
                         value={formatDateForInput(formData[field.name] || '')}
                         onChange={handleChange}
+                        min={field.name === 'endDate' ? getMinEndDate() : undefined}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                       />
                     )}
@@ -194,12 +277,16 @@ function AddItemModal({ isOpen, onClose, onAdd, title, type, fields = [], useDon
               </motion.button>
               <motion.button
                 type="submit"
-                className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                disabled={!formData.title?.trim()}
+                className={`px-4 py-2 rounded-lg ${
+                  canSubmit() 
+                    ? 'bg-primary-500 text-white hover:bg-primary-600' 
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+                whileHover={canSubmit() ? { scale: 1.02 } : {}}
+                whileTap={canSubmit() ? { scale: 0.98 } : {}}
+                disabled={!canSubmit()}
               >
-                Add
+                {isEditMode ? 'Save Changes' : 'Add'}
               </motion.button>
             </div>
           </form>
