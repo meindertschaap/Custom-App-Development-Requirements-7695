@@ -28,6 +28,7 @@ const TopBar=memo(function TopBar({
   // Critical filter options with intelligent filtering
   const criticalOptions=[
     {key: 'all',label: 'Show Everything'},
+    {key: 'still-building',label: 'SHOW Still Building...'},
     {key: 'doing-well',label: 'Show ONLY Donors/Grants Doing Well (check!)'},
     {key: 'ending-soon',label: 'Show ONLY Donors/Grants Ending Soon'},
     {key: 'report-dates',label: 'Show ONLY Almost-Due/Overdue Report Dates'},
@@ -37,7 +38,7 @@ const TopBar=memo(function TopBar({
   ];
 
   // Handle clearing the search
-  const handleClearSearch = () => {
+  const handleClearSearch=()=> {
     setSearchQuery('');
   };
 
@@ -60,6 +61,7 @@ const TopBar=memo(function TopBar({
                 </h1>
                 <div className="flex items-center gap-3">
                   <p className="text-base text-primary-600">{subtitle}</p>
+
                   {/* Return to Filter Results */}
                   {showingFilterResults===false && criticalFilter !=='all' && (
                     <motion.button
@@ -71,6 +73,7 @@ const TopBar=memo(function TopBar({
                       ← back to filter results
                     </motion.button>
                   )}
+
                   {/* NEW: Return to Search Results */}
                   {showingSearchResults===false && searchQuery.trim() && (
                     <motion.button
@@ -85,8 +88,12 @@ const TopBar=memo(function TopBar({
                 </div>
               </div>
             </div>
+
             <div className="relative max-w-md">
-              <SafeIcon icon={FiSearch} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-xl" />
+              <SafeIcon
+                icon={FiSearch}
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-xl"
+              />
               <input
                 type="text"
                 placeholder="Search any text or item..."
@@ -100,9 +107,9 @@ const TopBar=memo(function TopBar({
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                   whileHover={{scale: 1.1}}
                   whileTap={{scale: 0.9}}
-                  initial={{opacity: 0, scale: 0.8}}
-                  animate={{opacity: 1, scale: 1}}
-                  exit={{opacity: 0, scale: 0.8}}
+                  initial={{opacity: 0,scale: 0.8}}
+                  animate={{opacity: 1,scale: 1}}
+                  exit={{opacity: 0,scale: 0.8}}
                   transition={{duration: 0.15}}
                 >
                   <SafeIcon icon={FiX} className="text-lg" />
@@ -132,7 +139,12 @@ const TopBar=memo(function TopBar({
                 title="Upload Data"
               >
                 <SafeIcon icon={FiUpload} className="text-xl" />
-                <input type="file" accept=".json" onChange={onImport} className="hidden" />
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={onImport}
+                  className="hidden"
+                />
               </motion.label>
 
               <motion.button

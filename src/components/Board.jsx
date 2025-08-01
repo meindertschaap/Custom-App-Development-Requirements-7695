@@ -352,7 +352,7 @@ function Board() {
     return {isAlmostDueOrOverdue: false,isRedOverdue: false};
   };
 
-  // NEW: Function to check if a goal is "doing well"
+  // Function to check if a goal is "doing well"
   const isGoalDoingWell=useCallback((goal)=> {
     try {
       const today=new Date();
@@ -402,6 +402,56 @@ function Board() {
       return false;
     }
   },[]);
+  
+  // Function to check if a goal is "still building"
+  const isGoalStillBuilding = useCallback((goal) => {
+    try {
+      // Check if the goal has at least 2 promises (steps)
+      const hasAtLeastTwoPromises = goal.steps && goal.steps.length >= 2;
+      if (!hasAtLeastTwoPromises) {
+        return true; // Still building if doesn't have at least 2 promises
+      }
+      
+      // Check if each promise has at least 1 initiative
+      let allPromisesHaveInitiatives = true;
+      if (goal.steps) {
+        for (const step of goal.steps) {
+          if (!step.tasks || step.tasks.length === 0) {
+            allPromisesHaveInitiatives = false;
+            break;
+          }
+        }
+      }
+      if (!allPromisesHaveInitiatives) {
+        return true; // Still building if not all promises have initiatives
+      }
+      
+      // Count total UNCOMPLETED next actions across all branches
+      let totalUncompletedNextActions = 0;
+      if (goal.steps) {
+        for (const step of goal.steps) {
+          if (step.tasks) {
+            for (const task of step.tasks) {
+              if (task.initiatives) {
+                // Only count initiatives that are NOT completed
+                totalUncompletedNextActions += task.initiatives.filter(initiative => !initiative.completed).length;
+              }
+            }
+          }
+        }
+      }
+      
+      // Check if there are at least 2 uncompleted next actions total
+      if (totalUncompletedNextActions < 2) {
+        return true; // Still building if less than 2 uncompleted next actions total
+      }
+      
+      return false; // Not still building if meets all criteria
+    } catch (e) {
+      console.error('Error checking if goal is still building:', e);
+      return true; // Assume still building on error
+    }
+  }, []);
 
   // Intelligent filter function
   const applyIntelligentFilter=useCallback((filterType)=> {
@@ -428,8 +478,13 @@ function Board() {
           results.goals.push(goal);
         }
       } else if (filterType==='doing-well') {
-        // NEW: Check if goal is doing well
+        // Check if goal is doing well
         if (isGoalDoingWell(goal)) {
+          results.goals.push(goal);
+        }
+      } else if (filterType==='still-building') {
+        // Check if goal is still building
+        if (isGoalStillBuilding(goal)) {
           results.goals.push(goal);
         }
       }
@@ -467,7 +522,7 @@ function Board() {
     setSelectedGoal(null);
     setSelectedStep(null);
     setSelectedTask(null);
-  },[data.goals,selectedGoal,selectedStep,selectedTask,isGoalDoingWell]);
+  },[data.goals,selectedGoal,selectedStep,selectedTask,isGoalDoingWell,isGoalStillBuilding]);
 
   // MODIFIED: Handle critical filter changes with priority override
   const handleCriticalFilterChange=useCallback((newFilterValue)=> {
